@@ -1,23 +1,30 @@
 {
-  "name": "asw-temp",
+  "name": "one-click-account-swapper",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/build-background.js && next dev",
+    "build": "node scripts/build-background.js && next build && node scripts/post-build.js",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.42.2",
+    "lucide-react": "^1.23.0",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "tailwind-merge": "^3.6.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/chrome": "^0.2.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",

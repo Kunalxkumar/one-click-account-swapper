@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "One-Click Account Swapper",
+  "version": "1.0.0",
+  "description": "Securely swap between multiple accounts on Claude, ChatGPT, Gmail, GitHub, Discord, and more with one click.",
+  "permissions": [
+    "cookies",
+    "storage",
+    "scripting",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.chatgpt.com/*",
+    "*://*.claude.ai/*",
+    "*://*.google.com/*",
+    "*://*.github.com/*",
+    "*://*.discord.com/*",
+    "*://*.slack.com/*",
+    "*://*.notion.so/*",
+    "*://*.figma.com/*",
+    "*://*.reddit.com/*",
+    "*://*.twitter.com/*",
+    "*://*.x.com/*",
+    "*://*.facebook.com/*",
+    "*://*.instagram.com/*",
+    "*://*.linkedin.com/*"
+  ],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "commands": {
+    "swap_next_account": {
+      "suggested_key": {
+        "default": "Alt+Shift+Right"
+      },
+      "description": "Swap to next pinned account for the active website"
+    }
+  }
+}

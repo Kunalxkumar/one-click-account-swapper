@@ -14,6 +14,7 @@ export interface Account {
   isPinned: boolean;
   isFavorite: boolean;
   encryptedSession: string; // Encrypted JSON string of cookies & storage
+  expiresAt?: number;        // Optional minimum cookie expiration timestamp (seconds)
 }
 
 interface ExtensionState {
@@ -26,6 +27,8 @@ interface ExtensionState {
   // Data
   accounts: Account[];
   activeSessions: Record<string, string>; // websiteDomain -> accountId
+  customSites: { id: string; name: string; domain: string; icon: string }[];
+  swappingAccount: Account | null;
 
   // Tab tracking
   currentTabUrl: string | null;
@@ -48,6 +51,8 @@ interface ExtensionState {
   updateAccountLabel: (id: string, newLabel: string, newEmail: string, newColor: string) => Promise<void>;
   importBackup: (backupStr: string, password: string) => Promise<boolean>;
   exportBackup: (password: string) => Promise<string>;
+  addCustomSite: (name: string, domain: string) => Promise<boolean>;
+  deleteCustomSite: (id: string) => Promise<void>;
 }
 
 export const useStore = create<ExtensionState>((set, get) => ({
@@ -57,6 +62,8 @@ export const useStore = create<ExtensionState>((set, get) => ({
   masterPassword: null,
   accounts: [],
   activeSessions: {},
+  customSites: [],
+  swappingAccount: null,
   currentTabUrl: null,
   currentTabId: null,
   searchQuery: "",
@@ -76,16 +83,30 @@ export const useStore = create<ExtensionState>((set, get) => ({
 
         // 2. Fetch local storage state
         chrome.storage.local.get(
-          ["accounts", "hasMasterPassword", "activeSessions", "passwordVerifyPayload"],
-          (result) => {
+          ["accounts", "hasMasterPassword", "activeSessions", "passwordVerifyPayload", "customSites"],
+          async (result) => {
             const hasMasterPassword = !!result.hasMasterPassword;
             const accounts = (result.accounts || []) as Account[];
             const activeSessions = (result.activeSessions || {}) as Record<string, string>;
+            const customSites = (result.customSites || []) as { id: string; name: string; domain: string; icon: string }[];
+
+            // Dynamically register custom sites into the adapters list
+            try {
+              const { adapters, BaseAdapter } = await import("../adapters");
+              for (const site of customSites) {
+                if (!adapters[site.id]) {
+                  adapters[site.id] = new BaseAdapter(site.id, site.name, site.domain, site.icon || "Globe");
+                }
+              }
+            } catch (err) {
+              console.error("Failed to load custom adapters on init:", err);
+            }
 
             set({
               hasMasterPassword,
               accounts,
               activeSessions,
+              customSites,
               activeView: hasMasterPassword ? "unlock" : "setup_password",
             });
             resolve();
@@ -166,11 +187,23 @@ export const useStore = create<ExtensionState>((set, get) => ({
     const sessionStr = JSON.stringify(sessionData);
     const encryptedSession = await encryptData(sessionStr, password);
 
+    // Calculate minimum cookie expiration timestamp (if any expire)
+    let expiresAt: number | undefined;
+    if (sessionData && Array.isArray(sessionData.cookies)) {
+      const expirations = sessionData.cookies
+        .map((c: any) => c.expirationDate)
+        .filter((exp: any) => typeof exp === "number");
+      if (expirations.length > 0) {
+        expiresAt = Math.min(...expirations);
+      }
+    }
+
     const newAccount: Account = {
       ...accountData,
       id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
       lastUsed: Date.now(),
       encryptedSession,
+      expiresAt,
     };
 
     return new Promise((resolve) => {
@@ -247,50 +280,59 @@ export const useStore = create<ExtensionState>((set, get) => ({
       return;
     }
 
-    // 1. Decrypt session
-    const decryptedSessionStr = await decryptData(account.encryptedSession, password);
-    const sessionData = JSON.parse(decryptedSessionStr);
+    set({ swappingAccount: account });
 
-    // 2. Fetch adapter
-    const { getAdapterForUrl } = await import("../adapters");
-    const adapter = getAdapterForUrl(get().currentTabUrl || "");
-    if (!adapter) {
-      console.error("No adapter matches current URL");
-      return;
-    }
+    try {
+      // 1. Decrypt session
+      const decryptedSessionStr = await decryptData(account.encryptedSession, password);
+      const sessionData = JSON.parse(decryptedSessionStr);
 
-    // 3. Perform Swap: restore session variables
-    await adapter.restore(tabId, sessionData);
+      // 2. Fetch adapter
+      const { getAdapterForUrl } = await import("../adapters");
+      const adapter = getAdapterForUrl(get().currentTabUrl || "");
+      if (!adapter) {
+        console.error("No adapter matches current URL");
+        set({ swappingAccount: null });
+        return;
+      }
 
-    // 4. Update state and local storage
-    const updatedAccounts = get().accounts.map((acc) =>
-      acc.id === accountId ? { ...acc, lastUsed: Date.now() } : acc
-    );
+      // 3. Perform Swap: restore session variables
+      await adapter.restore(tabId, sessionData);
 
-    const activeSessions = {
-      ...get().activeSessions,
-      [account.websiteDomain]: accountId,
-    };
+      // 4. Update state and local storage
+      const updatedAccounts = get().accounts.map((acc) =>
+        acc.id === accountId ? { ...acc, lastUsed: Date.now() } : acc
+      );
 
-    return new Promise((resolve) => {
-      chrome.storage.local.set(
-        {
-          accounts: updatedAccounts,
-          activeSessions,
-        },
-        () => {
-          set({
+      const activeSessions = {
+        ...get().activeSessions,
+        [account.websiteDomain]: accountId,
+      };
+
+      return new Promise<void>((resolve) => {
+        chrome.storage.local.set(
+          {
             accounts: updatedAccounts,
             activeSessions,
-          });
+          },
+          () => {
+            set({
+              accounts: updatedAccounts,
+              activeSessions,
+              swappingAccount: null,
+            });
 
-          // 5. Reload active tab to apply session changes
-          chrome.tabs.reload(tabId, {}, () => {
-            resolve();
-          });
-        }
-      );
-    });
+            // 5. Reload active tab to apply session changes
+            chrome.tabs.reload(tabId, {}, () => {
+              resolve();
+            });
+          }
+        );
+      });
+    } catch (err) {
+      console.error("Error during swap:", err);
+      set({ swappingAccount: null });
+    }
   },
 
   exportBackup: async (password: string): Promise<string> => {
@@ -373,5 +415,70 @@ export const useStore = create<ExtensionState>((set, get) => ({
       console.error("Failed to import backup:", err);
       return false;
     }
+  },
+
+  addCustomSite: async (name: string, domain: string): Promise<boolean> => {
+    const id = domain.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    const newSite = {
+      id,
+      name,
+      domain,
+      icon: "Globe",
+    };
+
+    const hostPattern = `*://*.${domain}/*`;
+    
+    // Request permission from Chrome dynamically
+    const granted = await new Promise<boolean>((resolve) => {
+      if (typeof chrome !== "undefined" && chrome.permissions) {
+        chrome.permissions.request({ origins: [hostPattern] }, (res) => {
+          resolve(!!res);
+        });
+      } else {
+        // Mock permission in local development browser environment
+        resolve(true);
+      }
+    });
+
+    if (!granted) {
+      return false;
+    }
+
+    // Register dynamically in adapters
+    try {
+      const { adapters, BaseAdapter } = await import("../adapters");
+      if (!adapters[id]) {
+        adapters[id] = new BaseAdapter(id, name, domain, "Globe");
+      }
+    } catch (err) {
+      console.error("Failed to register custom adapter:", err);
+    }
+
+    const customSites = [...get().customSites, newSite];
+    return new Promise((resolve) => {
+      chrome.storage.local.set({ customSites }, () => {
+        set({ customSites });
+        resolve(true);
+      });
+    });
+  },
+
+  deleteCustomSite: async (id: string) => {
+    const customSites = get().customSites.filter((site) => site.id !== id);
+    
+    // Remove from active adapters
+    try {
+      const { adapters } = await import("../adapters");
+      delete adapters[id];
+    } catch (err) {
+      console.error("Failed to delete custom adapter:", err);
+    }
+
+    return new Promise((resolve) => {
+      chrome.storage.local.set({ customSites }, () => {
+        set({ customSites });
+        resolve();
+      });
+    });
   },
 }));

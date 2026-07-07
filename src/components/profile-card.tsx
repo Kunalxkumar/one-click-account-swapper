@@ -11,7 +11,8 @@ import {
   Edit2,
   Clock,
   Sparkles,
-  Save
+  Save,
+  Info
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ import { Account, useStore } from "@/lib/store";
 interface ProfileCardProps {
   account: Account;
   isActiveTabMatching: boolean;
+  onInspect?: () => void;
 }
 
 const colorMap: Record<string, { border: string; bg: string; text: string; accent: string; glow: string }> = {
@@ -32,7 +34,7 @@ const colorMap: Record<string, { border: string; bg: string; text: string; accen
   fuchsia: { border: "border-fuchsia-500/20 hover:border-fuchsia-500/40", bg: "bg-fuchsia-500/10", text: "text-fuchsia-400", accent: "bg-fuchsia-500", glow: "shadow-fuchsia-500/5" },
 };
 
-export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMatching }) => {
+export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMatching, onInspect }) => {
   const { 
     swapAccount, 
     deleteAccount, 
@@ -56,6 +58,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
   const colors = Object.keys(colorMap);
   const cTheme = colorMap[account.color] || colorMap.indigo;
   const isCurrentlyActiveSession = activeSessions[account.websiteDomain] === account.id;
+
+  // Expiry calculations
+  const isExpired = account.expiresAt !== undefined && account.expiresAt < Date.now() / 1000;
+  const isExpiringSoon = account.expiresAt !== undefined && !isExpired && account.expiresAt < (Date.now() / 1000) + 86400;
 
   const handleSwap = async () => {
     setIsSwapping(true);
@@ -134,13 +140,25 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
         isCurrentlyActiveSession && "ring-1 ring-indigo-500/40"
       )}
     >
-      {/* Top Banner indicating Active status */}
-      {isCurrentlyActiveSession && (
-        <span className="absolute -top-2 right-4 px-2 py-0.5 rounded-full text-[9px] font-semibold tracking-wider bg-indigo-500 text-white flex items-center gap-1 shadow-sm shadow-indigo-500/20">
-          <Sparkles className="w-2.5 h-2.5" />
-          ACTIVE
-        </span>
-      )}
+      {/* Top Banner indicating Active and/or Expiry status */}
+      <div className="absolute -top-2 right-4 flex items-center gap-1.5 select-none">
+        {isCurrentlyActiveSession && (
+          <span className="px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-indigo-500 text-white flex items-center gap-1 shadow-sm shadow-indigo-500/20">
+            <Sparkles className="w-2.5 h-2.5" />
+            ACTIVE
+          </span>
+        )}
+        {isExpired && (
+          <span className="px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-rose-500 text-white flex items-center gap-1 shadow-sm shadow-rose-500/20">
+            EXPIRED
+          </span>
+        )}
+        {isExpiringSoon && (
+          <span className="px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-amber-500 text-slate-950 flex items-center gap-1 shadow-sm shadow-amber-500/20">
+            EXPIRING
+          </span>
+        )}
+      </div>
 
       {/* Card Body */}
       <div className="space-y-3">
@@ -249,6 +267,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
                 title="Edit details"
               >
                 <Edit2 className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                onClick={onInspect}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-white/5 hover:text-white transition-colors"
+                title="Inspect session details"
+              >
+                <Info className="w-3.5 h-3.5" />
               </button>
 
               <button

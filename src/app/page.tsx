@@ -25,7 +25,9 @@ import {
   Eye,
   EyeOff,
   RefreshCw,
-  HelpCircle
+  HelpCircle,
+  Globe,
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore, Account } from "@/lib/store";
@@ -321,11 +323,42 @@ function MainView() {
     accounts,
     currentTabUrl,
     currentTabId,
-    addAccount
+    addAccount,
+    swappingAccount
   } = useStore();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isPopupView, setIsPopupView] = useState(true);
+
+  // Inspector Dialog states
+  const [inspectedAccount, setInspectedAccount] = useState<Account | null>(null);
+  const [inspectedSession, setInspectedSession] = useState<any>(null);
+  const [showMaskedValues, setShowMaskedValues] = useState(false);
+  const [inspectError, setInspectError] = useState("");
+  const [activeInspectorTab, setActiveInspectorTab] = useState<"cookies" | "storage">("cookies");
+
+  const handleInspect = async (account: Account) => {
+    setInspectedAccount(account);
+    setInspectedSession(null);
+    setInspectError("");
+    setShowMaskedValues(false);
+    setActiveInspectorTab("cookies");
+    
+    const password = useStore.getState().masterPassword;
+    if (!password) {
+      setInspectError("Database locked.");
+      return;
+    }
+    
+    try {
+      const { decryptData } = await import("@/lib/crypto");
+      const decrypted = await decryptData(account.encryptedSession, password);
+      const session = JSON.parse(decrypted);
+      setInspectedSession(session);
+    } catch (err) {
+      setInspectError("Failed to decrypt session details.");
+    }
+  };
 
   // Manage popup dimensions & responsive detection
   useEffect(() => {
@@ -443,6 +476,7 @@ function MainView() {
                         isActiveTabMatching={currentTabUrl ? (
                           currentTabUrl.includes(acc.websiteDomain) || acc.websiteDomain.includes(new URL(currentTabUrl).hostname)
                         ) : false}
+                        onInspect={() => handleInspect(acc)}
                       />
                     ))
                   ) : (
@@ -472,6 +506,205 @@ function MainView() {
           )}
         </div>
       </div>
+
+      {/* Swapping Overlay animation */}
+      <AnimatePresence>
+        {swappingAccount && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center space-y-6 select-none"
+          >
+            <div className="relative">
+              <div className="absolute inset-0 rounded-2xl bg-indigo-600/30 blur-xl animate-pulse" />
+              <motion.div
+                initial={{ scale: 0.8 }}
+                animate={{ scale: [0.8, 1.1, 1], rotate: [0, 360, 360] }}
+                transition={{ duration: 1.2, ease: "easeInOut", repeat: Infinity }}
+                className="relative w-16 h-16 rounded-2xl bg-slate-900 border border-indigo-500/30 flex items-center justify-center shadow-2xl"
+              >
+                <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" />
+              </motion.div>
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="font-bold text-xs text-white uppercase tracking-wider bg-gradient-to-r from-indigo-200 to-violet-200 bg-clip-text text-transparent">
+                Swapping Account
+              </h3>
+              <p className="text-[10px] text-slate-400">
+                Restoring session for {swappingAccount.name}...
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Session Inspector Modal */}
+      <AnimatePresence>
+        {inspectedAccount && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="w-full max-w-sm max-h-[80vh] bg-slate-900 border border-white/10 rounded-xl flex flex-col overflow-hidden shadow-2xl text-slate-300"
+            >
+              {/* Header */}
+              <div className="p-3.5 border-b border-white/5 flex items-center justify-between bg-slate-950/20">
+                <div>
+                  <h3 className="font-bold text-xs text-white">Session Inspector</h3>
+                  <p className="text-[9px] text-slate-500">
+                    {inspectedAccount.name} • {inspectedAccount.websiteName}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setInspectedAccount(null)}
+                  className="p-1 rounded-md hover:bg-white/5 text-slate-500 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex border-b border-white/5 px-2 bg-slate-950/40">
+                <button
+                  onClick={() => setActiveInspectorTab("cookies")}
+                  className={cn(
+                    "px-3 py-2 text-[10px] uppercase font-bold tracking-wider border-b-2 transition-all",
+                    activeInspectorTab === "cookies"
+                      ? "border-indigo-500 text-indigo-400"
+                      : "border-transparent text-slate-500 hover:text-white"
+                  )}
+                >
+                  Cookies ({inspectedSession?.cookies?.length || 0})
+                </button>
+                <button
+                  onClick={() => setActiveInspectorTab("storage")}
+                  className={cn(
+                    "px-3 py-2 text-[10px] uppercase font-bold tracking-wider border-b-2 transition-all",
+                    activeInspectorTab === "storage"
+                      ? "border-indigo-500 text-indigo-400"
+                      : "border-transparent text-slate-500 hover:text-white"
+                  )}
+                >
+                  Storage ({Object.keys(inspectedSession?.localStorage || {}).length + Object.keys(inspectedSession?.sessionStorage || {}).length})
+                </button>
+              </div>
+
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto p-3.5 bg-slate-950/20">
+                {inspectError ? (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center gap-2 text-rose-400 text-[10px]">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{inspectError}</span>
+                  </div>
+                ) : !inspectedSession ? (
+                  <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                    <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
+                    <p className="text-[10px] text-slate-500">Decrypting session data...</p>
+                  </div>
+                ) : activeInspectorTab === "cookies" ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between pb-1">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                        Cookies List
+                      </p>
+                      <button
+                        onClick={() => setShowMaskedValues(!showMaskedValues)}
+                        className="text-[9px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                      >
+                        {showMaskedValues ? "Hide values" : "Show values"}
+                      </button>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[35vh] overflow-y-auto pr-1">
+                      {inspectedSession.cookies.map((cookie: any, idx: number) => (
+                        <div key={idx} className="p-2 rounded bg-slate-950/60 border border-white/5 space-y-1 font-mono text-[9px]">
+                          <div className="flex items-center justify-between text-[9px] font-bold text-slate-300">
+                            <span className="truncate max-w-[160px] text-indigo-300">{cookie.name}</span>
+                            <span className="text-[7px] px-1 py-0.2 rounded bg-slate-800 text-slate-500">
+                              {cookie.expirationDate ? "Exp" : "Session"}
+                            </span>
+                          </div>
+                          <div className="text-slate-500 truncate">
+                            Value: <span className="text-slate-400">{showMaskedValues ? cookie.value : "••••••••••••••••"}</span>
+                          </div>
+                          <div className="text-[8px] text-slate-600 flex justify-between">
+                            <span>Domain: {cookie.domain}</span>
+                            <span>Secure: {cookie.secure ? "Y" : "N"}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between pb-1">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                        Key Value Storage
+                      </p>
+                      <button
+                        onClick={() => setShowMaskedValues(!showMaskedValues)}
+                        className="text-[9px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                      >
+                        {showMaskedValues ? "Hide values" : "Show values"}
+                      </button>
+                    </div>
+
+                    {Object.keys(inspectedSession.localStorage).length === 0 &&
+                     Object.keys(inspectedSession.sessionStorage).length === 0 ? (
+                      <p className="text-center text-[9px] text-slate-600 py-6">
+                        No storage variables captured.
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-[35vh] overflow-y-auto pr-1">
+                        {Object.entries(inspectedSession.localStorage).map(([k, v]: any) => (
+                          <div key={k} className="p-2 rounded bg-slate-950/60 border border-white/5 space-y-1 font-mono text-[9px]">
+                            <div className="flex items-center justify-between text-[9px] font-bold text-slate-300">
+                              <span className="truncate max-w-[160px] text-emerald-400">{k}</span>
+                              <span className="text-[7px] px-1 py-0.2 rounded bg-slate-800 text-emerald-500/50">local</span>
+                            </div>
+                            <div className="text-slate-500 break-all max-h-12 overflow-y-auto">
+                              {showMaskedValues ? v : "••••••••••••••••"}
+                            </div>
+                          </div>
+                        ))}
+
+                        {Object.entries(inspectedSession.sessionStorage).map(([k, v]: any) => (
+                          <div key={k} className="p-2 rounded bg-slate-950/60 border border-white/5 space-y-1 font-mono text-[9px]">
+                            <div className="flex items-center justify-between text-[9px] font-bold text-slate-300">
+                              <span className="truncate max-w-[160px] text-cyan-400">{k}</span>
+                              <span className="text-[7px] px-1 py-0.2 rounded bg-slate-800 text-cyan-500/50">session</span>
+                            </div>
+                            <div className="text-slate-500 break-all max-h-12 overflow-y-auto">
+                              {showMaskedValues ? v : "••••••••••••••••"}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Close Footer */}
+              <div className="p-3 border-t border-white/5 bg-slate-950/30 flex justify-end">
+                <button
+                  onClick={() => setInspectedAccount(null)}
+                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -678,13 +911,20 @@ function CapturePanel({ adapter }: { adapter: any }) {
    VIEW 4: Settings (Backups, Encryption management)
    ============================================================================ */
 function SettingsView() {
-  const { exportBackup, importBackup, lock } = useStore();
+  const { exportBackup, importBackup, lock, customSites, addCustomSite, deleteCustomSite } = useStore();
   const [backupPassword, setBackupPassword] = useState("");
   const [backupStr, setBackupStr] = useState("");
   const [exportedResult, setExportedResult] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Custom site form states
+  const [siteName, setSiteName] = useState("");
+  const [siteDomain, setSiteDomain] = useState("");
+  const [sitePending, setSitePending] = useState(false);
+  const [siteError, setSiteError] = useState("");
+  const [siteSuccess, setSiteSuccess] = useState(false);
 
   const handleExport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -733,8 +973,126 @@ function SettingsView() {
     }
   };
 
+  const handleAddSite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSiteError("");
+    setSiteSuccess(false);
+
+    if (!siteName.trim() || !siteDomain.trim()) {
+      setSiteError("All fields are required.");
+      return;
+    }
+
+    let domain = siteDomain.trim().toLowerCase();
+    try {
+      if (domain.includes("://")) {
+        domain = new URL(domain).hostname;
+      }
+    } catch {
+      // ignore
+    }
+
+    setSitePending(true);
+    const success = await addCustomSite(siteName.trim(), domain);
+    setSitePending(false);
+
+    if (success) {
+      setSiteSuccess(true);
+      setSiteName("");
+      setSiteDomain("");
+      setTimeout(() => setSiteSuccess(false), 2000);
+    } else {
+      setSiteError("Permission rejected or invalid domain.");
+    }
+  };
+
   return (
     <div className="space-y-4 pb-8 select-none text-slate-300">
+      {/* Custom Sites Management */}
+      <div className="p-4 rounded-xl border border-white/5 bg-slate-900/10 space-y-4">
+        <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+          <Globe className="w-4 h-4 text-indigo-400" />
+          Custom Websites
+        </h3>
+        
+        <form onSubmit={handleAddSite} className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">
+                Website Name
+              </label>
+              <input
+                type="text"
+                required
+                value={siteName}
+                onChange={(e) => setSiteName(e.target.value)}
+                placeholder="e.g. My Workspace"
+                className="w-full px-2.5 py-1.5 bg-slate-950/60 border border-white/5 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">
+                Domain Name
+              </label>
+              <input
+                type="text"
+                required
+                value={siteDomain}
+                onChange={(e) => setSiteDomain(e.target.value)}
+                placeholder="e.g. workspace.com"
+                className="w-full px-2.5 py-1.5 bg-slate-950/60 border border-white/5 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          {siteError && (
+            <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[9px] flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>{siteError}</span>
+            </div>
+          )}
+
+          {siteSuccess && (
+            <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] flex items-center gap-1">
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>Site registered successfully!</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={sitePending}
+            className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white rounded-lg text-xs font-semibold cursor-pointer select-none active:scale-95 transition-all"
+          >
+            {sitePending ? "Requesting host permission..." : "Register Site & Request Permissions"}
+          </button>
+        </form>
+
+        {customSites.length > 0 && (
+          <div className="space-y-1.5 border-t border-white/5 pt-3">
+            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+              Registered Custom Sites
+            </p>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+              {customSites.map((site) => (
+                <div key={site.id} className="flex items-center justify-between p-2 rounded bg-slate-950/40 border border-white/5 text-[10px]">
+                  <div>
+                    <span className="font-semibold text-white">{site.name}</span>
+                    <span className="text-[8px] text-slate-500 ml-1.5">({site.domain})</span>
+                  </div>
+                  <button
+                    onClick={() => deleteCustomSite(site.id)}
+                    className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Encryption Details */}
       <div className="p-3.5 rounded-xl border border-white/5 bg-slate-900/10 space-y-2">
         <h3 className="text-xs font-bold text-white flex items-center gap-1.5">

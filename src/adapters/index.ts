@@ -34,20 +34,12 @@ export class BaseAdapter implements WebsiteAdapter {
 
   // Check if permission is granted for hosts
   async hasPermission(): Promise<boolean> {
-    return new Promise((resolve) => {
-      chrome.permissions.contains({ origins: this.hosts }, (granted) => {
-        resolve(!!granted);
-      });
-    });
+    return chrome.permissions.contains({ origins: this.hosts });
   }
 
   // Request permission for hosts
   async requestPermission(): Promise<boolean> {
-    return new Promise((resolve) => {
-      chrome.permissions.request({ origins: this.hosts }, (granted) => {
-        resolve(!!granted);
-      });
-    });
+    return chrome.permissions.request({ origins: this.hosts });
   }
 
   async capture(tabId: number): Promise<SessionData> {

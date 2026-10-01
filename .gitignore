@@ -19,6 +19,7 @@
 
 # production
 /build
+/dist/
 
 # misc
 .DS_Store
@@ -39,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# e2e testing artifacts
+temp-e2e-profile/
+.playwright-mcp/
+e2e_*.png
+extension_*.png

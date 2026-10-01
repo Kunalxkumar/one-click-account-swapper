@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/build-background.js && next dev",
-    "build": "node scripts/build-background.js && next build && node scripts/post-build.js",
+    "dev": "node scripts/generate-icons.js && node scripts/build-background.js && next dev",
+    "build": "node scripts/generate-icons.js && node scripts/build-background.js && next build && node scripts/post-build.js",
+    "package": "npm run build && node scripts/package.js",
     "start": "next start",
     "lint": "eslint"
   },

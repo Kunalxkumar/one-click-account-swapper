@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { 
   Lock, 
   Unlock, 
@@ -13,7 +13,8 @@ import {
   Key,
   Database,
   ArrowRight,
-  Sparkles,
+  Shield,
+  ShieldCheck,
   Menu,
   X,
   Compass,
@@ -27,7 +28,8 @@ import {
   RefreshCw,
   HelpCircle,
   Globe,
-  Trash2
+  Trash2,
+  Cpu
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore, Account } from "@/lib/store";
@@ -46,8 +48,8 @@ export default function Page() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+      <div className="min-h-screen bg-[#090b10] flex items-center justify-center font-mono">
+        <RefreshCw className="w-5 h-5 text-amber-500 animate-spin" />
       </div>
     );
   }
@@ -80,10 +82,14 @@ function DashboardContainer() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
-          <p className="text-xs text-slate-500">Securing Session Store...</p>
+      <div className="min-h-screen bg-[#090b10] flex items-center justify-center font-mono p-4">
+        <div className="text-center space-y-3">
+          <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
+            <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" />
+          </div>
+          <p className="text-[11px] text-slate-400 uppercase tracking-widest">
+            Securing Session Store...
+          </p>
         </div>
       </div>
     );
@@ -114,12 +120,26 @@ function SetupPasswordView({ onSetup }: SetupPasswordViewProps) {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
+  // Password strength calculation
+  const strength = useMemo(() => {
+    if (!password) return 0;
+    let s = 0;
+    if (password.length >= 8) s += 1;
+    if (password.length >= 12) s += 1;
+    if (/[0-9]/.test(password)) s += 1;
+    if (/[^A-Za-z0-9]/.test(password)) s += 1;
+    return s;
+  }, [password]);
+
+  const strengthLabels = ["WEAK", "FAIR", "GOOD", "STRONG"];
+  const strengthColor = strength <= 1 ? "bg-rose-500" : strength === 2 ? "bg-amber-500" : "bg-emerald-500";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters long.");
+      setError("Master password requires at least 8 characters.");
       return;
     }
     if (password !== confirmPassword) {
@@ -131,33 +151,34 @@ function SetupPasswordView({ onSetup }: SetupPasswordViewProps) {
     try {
       await onSetup(password);
     } catch (err) {
-      setError("Failed to create master key.");
+      setError("Failed to initialize cryptographic master key.");
     } finally {
       setPending(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-animate flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-sm glass rounded-2xl p-6 shadow-2xl space-y-6"
-      >
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-            <Key className="w-6 h-6 text-indigo-400" />
+    <div className="min-h-screen w-full bg-[#090b10] flex items-center justify-center p-4 font-sans antialiased text-slate-100">
+      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-[#0d1017] p-6 shadow-2xl space-y-6">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
+              <Key className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-white">Create Master Key</h2>
+              <span className="text-[10px] font-mono text-amber-500/90 font-medium">AES-256-GCM / PBKDF2-100K</span>
+            </div>
           </div>
-          <h2 className="text-lg font-bold text-white tracking-tight">Create Master Password</h2>
-          <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-            This password encrypts all saved cookie & storage session tokens. It is stored only in RAM and never saved to disk or network.
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            Encrypts all cookie jars and local storage sessions. Kept in memory only and never written to disk or sent over network.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1 relative">
-            <label className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
-              Password
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
+              Master Password
             </label>
             <div className="relative">
               <input
@@ -165,22 +186,44 @@ function SetupPasswordView({ onSetup }: SetupPasswordViewProps) {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 8 characters"
-                className="w-full px-3 py-2 bg-slate-950/60 border border-white/5 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Min 8 characters"
+                className="w-full px-3 py-2 bg-[#090b10] border border-white/10 rounded-lg text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-colors"
               />
               <button
                 type="button"
+                aria-label={showPass ? "Hide password" : "Show password"}
                 onClick={() => setShowPass(!showPass)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
               >
                 {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+
+            {/* Password strength micro-meter */}
+            {password.length > 0 && (
+              <div className="pt-1.5 space-y-1">
+                <div className="flex gap-1 h-1">
+                  {[1, 2, 3, 4].map((step) => (
+                    <div
+                      key={step}
+                      className={cn(
+                        "flex-1 rounded-sm transition-colors duration-200",
+                        step <= strength ? strengthColor : "bg-white/10"
+                      )}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between text-[9px] font-mono text-slate-500">
+                  <span>STRENGTH:</span>
+                  <span className="font-semibold text-slate-300">{strengthLabels[Math.max(0, strength - 1)]}</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
-              Confirm Password
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
+              Confirm Master Password
             </label>
             <input
               type={showPass ? "text" : "password"}
@@ -188,13 +231,13 @@ function SetupPasswordView({ onSetup }: SetupPasswordViewProps) {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm password"
-              className="w-full px-3 py-2 bg-slate-950/60 border border-white/5 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-3 py-2 bg-[#090b10] border border-white/10 rounded-lg text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-colors"
             />
           </div>
 
           {error && (
-            <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[10px] flex items-center gap-1.5 animate-shake">
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-[11px] font-mono flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
           )}
@@ -202,19 +245,19 @@ function SetupPasswordView({ onSetup }: SetupPasswordViewProps) {
           <button
             type="submit"
             disabled={pending}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white py-2 rounded-lg text-xs font-semibold select-none cursor-pointer transition-all hover:shadow-lg hover:shadow-indigo-500/20"
+            className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer shadow-sm shadow-amber-500/20"
           >
             {pending ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
             ) : (
               <>
-                <span>Secure Wallet</span>
+                <span>Initialize Vault</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </>
             )}
           </button>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -238,31 +281,32 @@ function UnlockView({ onUnlock }: UnlockViewProps) {
 
     const success = await onUnlock(password);
     if (!success) {
-      setError("Incorrect password. Please try again.");
+      setError("Authentication failed. Incorrect master password.");
       setPending(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-animate flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-sm glass rounded-2xl p-6 shadow-2xl space-y-6"
-      >
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto border border-indigo-500/20 shadow-lg shadow-indigo-500/5">
-            <Lock className="w-5 h-5 text-indigo-400" />
+    <div className="min-h-screen w-full bg-[#090b10] flex items-center justify-center p-4 font-sans antialiased text-slate-100">
+      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-[#0d1017] p-6 shadow-2xl space-y-6">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
+              <Lock className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-white">Vault Locked</h2>
+              <span className="text-[10px] font-mono text-slate-500">ENCRYPTED AT REST</span>
+            </div>
           </div>
-          <h2 className="text-lg font-bold text-white tracking-tight">Swapper Locked</h2>
-          <p className="text-[11px] text-slate-400">
-            Enter your master password to decrypt saved sessions.
+          <p className="text-[11px] text-slate-400 leading-relaxed">
+            Enter your master password to decrypt credentials into isolated runtime memory.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1 relative">
-            <label className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
               Master Password
             </label>
             <div className="relative">
@@ -272,13 +316,14 @@ function UnlockView({ onUnlock }: UnlockViewProps) {
                 autoFocus
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter master password"
-                className="w-full px-3 py-2 bg-slate-950/60 border border-white/5 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Enter password"
+                className="w-full px-3 py-2 bg-[#090b10] border border-white/10 rounded-lg text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-colors"
               />
               <button
                 type="button"
+                aria-label={showPass ? "Hide password" : "Show password"}
                 onClick={() => setShowPass(!showPass)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
               >
                 {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -286,8 +331,8 @@ function UnlockView({ onUnlock }: UnlockViewProps) {
           </div>
 
           {error && (
-            <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[10px] flex items-center gap-1.5 animate-shake">
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/25 text-rose-300 text-[11px] font-mono flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
           )}
@@ -295,19 +340,19 @@ function UnlockView({ onUnlock }: UnlockViewProps) {
           <button
             type="submit"
             disabled={pending}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white py-2 rounded-lg text-xs font-semibold select-none cursor-pointer transition-all hover:shadow-lg hover:shadow-indigo-500/20"
+            className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer shadow-sm shadow-amber-500/20"
           >
             {pending ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
             ) : (
               <>
-                <span>Unlock Wallet</span>
+                <span>Unlock Vault</span>
                 <Unlock className="w-3.5 h-3.5" />
               </>
             )}
           </button>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -363,7 +408,6 @@ function MainView() {
   // Manage popup dimensions & responsive detection
   useEffect(() => {
     const handleResize = () => {
-      // Chrome extension popup has narrow viewport (e.g. < 450px)
       setIsPopupView(window.innerWidth < 500);
     };
     handleResize();
@@ -373,7 +417,6 @@ function MainView() {
 
   // Filter accounts
   const filteredAccounts = accounts.filter((acc) => {
-    // 1. Search Query Fuzzy matching
     const q = searchQuery.toLowerCase();
     const matchesSearch = 
       acc.name.toLowerCase().includes(q) ||
@@ -383,12 +426,10 @@ function MainView() {
 
     if (!matchesSearch) return false;
 
-    // 2. Category matching
     if (selectedCategory === "all") return true;
     if (selectedCategory === "pinned") return acc.isPinned;
     if (selectedCategory === "favorites") return acc.isFavorite;
     
-    // Website filter
     return acc.websiteId === selectedCategory;
   });
 
@@ -397,7 +438,7 @@ function MainView() {
 
   return (
     <div className={cn(
-      "flex bg-slate-950 text-slate-100 overflow-hidden",
+      "flex bg-[#090b10] text-slate-100 overflow-hidden font-sans antialiased",
       isPopupView ? "w-[380px] h-[600px]" : "w-screen h-screen"
     )}>
       {/* Sidebar navigation */}
@@ -408,30 +449,32 @@ function MainView() {
       />
 
       {/* Main Body content */}
-      <div className="flex-1 flex flex-col min-w-0 h-full bg-slate-950 relative">
+      <div className="flex-1 flex flex-col min-w-0 h-full bg-[#090b10] relative">
         {/* Top Header */}
-        <header className="flex items-center justify-between p-3 border-b border-white/5 bg-slate-900/10 backdrop-blur-sm select-none">
+        <header className="flex items-center justify-between px-3.5 py-2.5 border-b border-white/10 bg-[#0d1017]/80 backdrop-blur-md select-none">
           <div className="flex items-center gap-2">
             {isPopupView && (
               <button 
                 onClick={() => setSidebarOpen(true)}
-                className="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white"
+                className="p-1.5 rounded-md hover:bg-white/5 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                aria-label="Open sidebar menu"
               >
                 <Menu className="w-4 h-4" />
               </button>
             )}
-            <h2 className="font-bold text-xs uppercase tracking-wider text-slate-400">
-              {activeView === "settings" ? "Settings" : "Accounts Dashboard"}
+            <h2 className="font-mono font-bold text-xs uppercase tracking-wider text-slate-300">
+              {activeView === "settings" ? "Settings" : "Vault Dashboard"}
             </h2>
           </div>
 
-          <div className="text-[10px] text-slate-500 font-medium">
-            Active Profiles: {accounts.length}
+          <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{accounts.length} PROFILES</span>
           </div>
         </header>
 
         {/* Content Box */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
           {activeView === "settings" ? (
             <SettingsView />
           ) : (
@@ -440,14 +483,14 @@ function MainView() {
               {matchingAdapter ? (
                 <CapturePanel adapter={matchingAdapter} />
               ) : (
-                <div className="p-3.5 rounded-xl border border-white/5 bg-slate-900/20 backdrop-blur-md flex items-start gap-2.5">
-                  <Compass className="w-4 h-4 text-slate-500 mt-0.5" />
+                <div className="p-3 rounded-lg border border-white/5 bg-[#0d1017] flex items-start gap-2.5">
+                  <Compass className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
                   <div className="space-y-0.5">
-                    <h4 className="text-[11px] font-semibold text-slate-400">
+                    <h4 className="text-[11px] font-semibold text-slate-300">
                       No active website detected
                     </h4>
-                    <p className="text-[9px] text-slate-500 leading-relaxed">
-                      Visit Claude, ChatGPT, Gemini, Gmail, or Github in your browser to capture its authenticated session.
+                    <p className="text-[9px] text-slate-500 leading-relaxed font-mono">
+                      Navigate to GitHub, Claude, ChatGPT, Gemini, or Gmail in your browser to capture sessions.
                     </p>
                   </div>
                 </div>
@@ -460,13 +503,13 @@ function MainView() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => useStore.setState({ searchQuery: e.target.value })}
-                  placeholder="Search profiles, emails, websites..."
-                  className="w-full pl-8 pr-4 py-1.5 bg-slate-900/40 border border-white/5 rounded-lg text-xs placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="Filter profiles, emails, domains..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-[#0d1017] border border-white/10 rounded-md text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-colors"
                 />
               </div>
 
               {/* Profile grid */}
-              <div className="grid grid-cols-1 gap-3 pb-6">
+              <div className="grid grid-cols-1 gap-2.5 pb-6">
                 <AnimatePresence mode="popLayout">
                   {filteredAccounts.length > 0 ? (
                     filteredAccounts.map((acc) => (
@@ -480,25 +523,21 @@ function MainView() {
                       />
                     ))
                   ) : (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="text-center py-12 space-y-3"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-slate-900 border border-white/5 flex items-center justify-center mx-auto">
-                        <Grid className="w-4 h-4 text-slate-600" />
+                    <div className="text-center py-12 space-y-2 border border-dashed border-white/10 rounded-lg bg-[#0d1017]/40">
+                      <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-slate-500">
+                        <Grid className="w-4 h-4" />
                       </div>
                       <div className="space-y-1">
-                        <h4 className="text-xs font-semibold text-slate-400">
-                          {accounts.length === 0 ? "No accounts added" : "No results found"}
+                        <h4 className="text-xs font-semibold text-slate-300">
+                          {accounts.length === 0 ? "No profiles in vault" : "No matching profiles"}
                         </h4>
-                        <p className="text-[10px] text-slate-600 max-w-[240px] mx-auto">
+                        <p className="text-[10px] text-slate-500 max-w-[220px] mx-auto font-mono">
                           {accounts.length === 0
-                            ? "Log into your accounts on supported sites, then capture them in the Swapper popup."
-                            : "Try adjusting your search filters or check your categories."}
+                            ? "Log into a supported site, open this popup, and capture the active session."
+                            : "Adjust search keywords or select 'All Profiles'."}
                         </p>
                       </div>
-                    </motion.div>
+                    </div>
                   )}
                 </AnimatePresence>
               </div>
@@ -510,75 +549,53 @@ function MainView() {
       {/* Swapping Overlay animation */}
       <AnimatePresence>
         {swappingAccount && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center space-y-6 select-none"
-          >
-            <div className="relative">
-              <div className="absolute inset-0 rounded-2xl bg-indigo-600/30 blur-xl animate-pulse" />
-              <motion.div
-                initial={{ scale: 0.8 }}
-                animate={{ scale: [0.8, 1.1, 1], rotate: [0, 360, 360] }}
-                transition={{ duration: 1.2, ease: "easeInOut", repeat: Infinity }}
-                className="relative w-16 h-16 rounded-2xl bg-slate-900 border border-indigo-500/30 flex items-center justify-center shadow-2xl"
-              >
-                <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" />
-              </motion.div>
+          <div className="fixed inset-0 z-50 bg-[#090b10]/95 backdrop-blur-sm flex flex-col items-center justify-center space-y-4 select-none">
+            <div className="w-12 h-12 rounded-full border-2 border-amber-500/20 border-t-amber-500 animate-spin flex items-center justify-center">
+              <Cpu className="w-5 h-5 text-amber-400" />
             </div>
             <div className="text-center space-y-1">
-              <h3 className="font-bold text-xs text-white uppercase tracking-wider bg-gradient-to-r from-indigo-200 to-violet-200 bg-clip-text text-transparent">
-                Swapping Account
+              <h3 className="font-mono font-bold text-xs uppercase tracking-wider text-white">
+                Swapping Session
               </h3>
-              <p className="text-[10px] text-slate-400">
-                Restoring session for {swappingAccount.name}...
+              <p className="text-[10px] font-mono text-slate-400">
+                Injecting cookie jar for {swappingAccount.name}...
               </p>
             </div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
       {/* Session Inspector Modal */}
       <AnimatePresence>
         {inspectedAccount && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 select-none"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="w-full max-w-sm max-h-[80vh] bg-slate-900 border border-white/10 rounded-xl flex flex-col overflow-hidden shadow-2xl text-slate-300"
-            >
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 select-none">
+            <div className="w-full max-w-sm max-h-[82vh] bg-[#0d1017] border border-white/10 rounded-lg flex flex-col overflow-hidden shadow-2xl text-slate-300">
               {/* Header */}
-              <div className="p-3.5 border-b border-white/5 flex items-center justify-between bg-slate-950/20">
+              <div className="px-3.5 py-2.5 border-b border-white/10 flex items-center justify-between bg-[#11141c]">
                 <div>
-                  <h3 className="font-bold text-xs text-white">Session Inspector</h3>
-                  <p className="text-[9px] text-slate-500">
+                  <h3 className="font-mono font-bold text-xs text-white uppercase tracking-wider">Session Inspector</h3>
+                  <p className="text-[9px] font-mono text-slate-400">
                     {inspectedAccount.name} • {inspectedAccount.websiteName}
                   </p>
                 </div>
                 <button
                   onClick={() => setInspectedAccount(null)}
-                  className="p-1 rounded-md hover:bg-white/5 text-slate-500 hover:text-white"
+                  className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                  aria-label="Close inspector"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Tabs */}
-              <div className="flex border-b border-white/5 px-2 bg-slate-950/40">
+              <div className="flex border-b border-white/10 px-2 bg-[#090b10]">
                 <button
                   onClick={() => setActiveInspectorTab("cookies")}
                   className={cn(
-                    "px-3 py-2 text-[10px] uppercase font-bold tracking-wider border-b-2 transition-all",
+                    "px-3 py-2 text-[10px] font-mono uppercase font-bold tracking-wider border-b-2 transition-colors cursor-pointer",
                     activeInspectorTab === "cookies"
-                      ? "border-indigo-500 text-indigo-400"
-                      : "border-transparent text-slate-500 hover:text-white"
+                      ? "border-amber-500 text-amber-400"
+                      : "border-transparent text-slate-500 hover:text-slate-300"
                   )}
                 >
                   Cookies ({inspectedSession?.cookies?.length || 0})
@@ -586,10 +603,10 @@ function MainView() {
                 <button
                   onClick={() => setActiveInspectorTab("storage")}
                   className={cn(
-                    "px-3 py-2 text-[10px] uppercase font-bold tracking-wider border-b-2 transition-all",
+                    "px-3 py-2 text-[10px] font-mono uppercase font-bold tracking-wider border-b-2 transition-colors cursor-pointer",
                     activeInspectorTab === "storage"
-                      ? "border-indigo-500 text-indigo-400"
-                      : "border-transparent text-slate-500 hover:text-white"
+                      ? "border-amber-500 text-amber-400"
+                      : "border-transparent text-slate-500 hover:text-slate-300"
                   )}
                 >
                   Storage ({Object.keys(inspectedSession?.localStorage || {}).length + Object.keys(inspectedSession?.sessionStorage || {}).length})
@@ -597,26 +614,26 @@ function MainView() {
               </div>
 
               {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto p-3.5 bg-slate-950/20">
+              <div className="flex-1 overflow-y-auto p-3 bg-[#090b10]">
                 {inspectError ? (
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center gap-2 text-rose-400 text-[10px]">
-                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 rounded-md flex items-center gap-2 text-rose-300 font-mono text-[10px]">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
                     <span>{inspectError}</span>
                   </div>
                 ) : !inspectedSession ? (
-                  <div className="flex flex-col items-center justify-center py-12 space-y-2">
-                    <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
-                    <p className="text-[10px] text-slate-500">Decrypting session data...</p>
+                  <div className="flex flex-col items-center justify-center py-10 space-y-2">
+                    <RefreshCw className="w-4 h-4 text-amber-500 animate-spin" />
+                    <p className="text-[10px] font-mono text-slate-500">Decrypting session payload...</p>
                   </div>
                 ) : activeInspectorTab === "cookies" ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between pb-1">
-                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-wider">
                         Cookies List
                       </p>
                       <button
                         onClick={() => setShowMaskedValues(!showMaskedValues)}
-                        className="text-[9px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                        className="text-[9px] font-mono text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
                       >
                         {showMaskedValues ? "Hide values" : "Show values"}
                       </button>
@@ -624,17 +641,17 @@ function MainView() {
 
                     <div className="space-y-1.5 max-h-[35vh] overflow-y-auto pr-1">
                       {inspectedSession.cookies.map((cookie: any, idx: number) => (
-                        <div key={idx} className="p-2 rounded bg-slate-950/60 border border-white/5 space-y-1 font-mono text-[9px]">
-                          <div className="flex items-center justify-between text-[9px] font-bold text-slate-300">
-                            <span className="truncate max-w-[160px] text-indigo-300">{cookie.name}</span>
-                            <span className="text-[7px] px-1 py-0.2 rounded bg-slate-800 text-slate-500">
+                        <div key={idx} className="p-2 rounded bg-[#0d1017] border border-white/5 space-y-1 font-mono text-[9px]">
+                          <div className="flex items-center justify-between text-[9px] font-bold text-slate-200">
+                            <span className="truncate max-w-[160px] text-amber-300">{cookie.name}</span>
+                            <span className="text-[7px] px-1 py-0.2 rounded bg-white/5 text-slate-400">
                               {cookie.expirationDate ? "Exp" : "Session"}
                             </span>
                           </div>
-                          <div className="text-slate-500 truncate">
-                            Value: <span className="text-slate-400">{showMaskedValues ? cookie.value : "••••••••••••••••"}</span>
+                          <div className="text-slate-400 truncate">
+                            Value: <span className="text-slate-300">{showMaskedValues ? cookie.value : "••••••••••••••••"}</span>
                           </div>
-                          <div className="text-[8px] text-slate-600 flex justify-between">
+                          <div className="text-[8px] text-slate-500 flex justify-between">
                             <span>Domain: {cookie.domain}</span>
                             <span>Secure: {cookie.secure ? "Y" : "N"}</span>
                           </div>
@@ -645,12 +662,12 @@ function MainView() {
                 ) : (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between pb-1">
-                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-wider">
                         Key Value Storage
                       </p>
                       <button
                         onClick={() => setShowMaskedValues(!showMaskedValues)}
-                        className="text-[9px] text-indigo-400 hover:text-indigo-300 font-semibold"
+                        className="text-[9px] font-mono text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
                       >
                         {showMaskedValues ? "Hide values" : "Show values"}
                       </button>
@@ -658,30 +675,30 @@ function MainView() {
 
                     {Object.keys(inspectedSession.localStorage).length === 0 &&
                      Object.keys(inspectedSession.sessionStorage).length === 0 ? (
-                      <p className="text-center text-[9px] text-slate-600 py-6">
+                      <p className="text-center font-mono text-[9px] text-slate-500 py-6">
                         No storage variables captured.
                       </p>
                     ) : (
                       <div className="space-y-1.5 max-h-[35vh] overflow-y-auto pr-1">
                         {Object.entries(inspectedSession.localStorage).map(([k, v]: any) => (
-                          <div key={k} className="p-2 rounded bg-slate-950/60 border border-white/5 space-y-1 font-mono text-[9px]">
-                            <div className="flex items-center justify-between text-[9px] font-bold text-slate-300">
+                          <div key={k} className="p-2 rounded bg-[#0d1017] border border-white/5 space-y-1 font-mono text-[9px]">
+                            <div className="flex items-center justify-between text-[9px] font-bold text-slate-200">
                               <span className="truncate max-w-[160px] text-emerald-400">{k}</span>
-                              <span className="text-[7px] px-1 py-0.2 rounded bg-slate-800 text-emerald-500/50">local</span>
+                              <span className="text-[7px] px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400">local</span>
                             </div>
-                            <div className="text-slate-500 break-all max-h-12 overflow-y-auto">
+                            <div className="text-slate-400 break-all max-h-12 overflow-y-auto">
                               {showMaskedValues ? v : "••••••••••••••••"}
                             </div>
                           </div>
                         ))}
 
                         {Object.entries(inspectedSession.sessionStorage).map(([k, v]: any) => (
-                          <div key={k} className="p-2 rounded bg-slate-950/60 border border-white/5 space-y-1 font-mono text-[9px]">
-                            <div className="flex items-center justify-between text-[9px] font-bold text-slate-300">
+                          <div key={k} className="p-2 rounded bg-[#0d1017] border border-white/5 space-y-1 font-mono text-[9px]">
+                            <div className="flex items-center justify-between text-[9px] font-bold text-slate-200">
                               <span className="truncate max-w-[160px] text-cyan-400">{k}</span>
-                              <span className="text-[7px] px-1 py-0.2 rounded bg-slate-800 text-cyan-500/50">session</span>
+                              <span className="text-[7px] px-1 py-0.2 rounded bg-cyan-500/10 text-cyan-400">session</span>
                             </div>
-                            <div className="text-slate-500 break-all max-h-12 overflow-y-auto">
+                            <div className="text-slate-400 break-all max-h-12 overflow-y-auto">
                               {showMaskedValues ? v : "••••••••••••••••"}
                             </div>
                           </div>
@@ -693,16 +710,16 @@ function MainView() {
               </div>
 
               {/* Close Footer */}
-              <div className="p-3 border-t border-white/5 bg-slate-950/30 flex justify-end">
+              <div className="p-2.5 border-t border-white/10 bg-[#11141c] flex justify-end">
                 <button
                   onClick={() => setInspectedAccount(null)}
-                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                  className="px-3 py-1 bg-white/10 hover:bg-white/15 text-white rounded text-xs font-mono font-medium cursor-pointer transition-colors"
                 >
                   Close
                 </button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
       </AnimatePresence>
     </div>
@@ -717,17 +734,14 @@ function CapturePanel({ adapter }: { adapter: any }) {
   const [isOpen, setIsOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [email, setEmail] = useState("");
-  const [color, setColor] = useState("indigo");
+  const [color, setColor] = useState("amber");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
 
-  const colors = ["indigo", "violet", "emerald", "amber", "rose", "cyan", "fuchsia"];
+  const colors = ["amber", "emerald", "cyan", "blue", "rose", "slate"];
 
-  // Pre-fill email dynamically if possible
   useEffect(() => {
     if (!isOpen) return;
-    // Attempt login detection / check if user exists. We query basic profile elements
-    // For now, prompt the user to input the email and label.
     setLabel("");
     setEmail("");
     setStatus("idle");
@@ -739,17 +753,19 @@ function CapturePanel({ adapter }: { adapter: any }) {
 
     setLoading(true);
     try {
-      // 1. Run capture through matching adapter
       const sessionData = await adapter.capture(currentTabId);
       
-      // Validate that session actually contains cookies
-      if (!sessionData.cookies || sessionData.cookies.length === 0) {
-        throw new Error("No active cookies captured. Are you signed in?");
+      const hasCookies = sessionData.cookies && sessionData.cookies.length > 0;
+      const hasStorage =
+        (sessionData.localStorage && Object.keys(sessionData.localStorage).length > 0) ||
+        (sessionData.sessionStorage && Object.keys(sessionData.sessionStorage).length > 0);
+
+      if (!hasCookies && !hasStorage) {
+        throw new Error("No active cookies or storage captured. Are you signed in?");
       }
 
-      // 2. Encrypt & Save to Store
       await addAccount({
-        name: label || `${adapter.name} User`,
+        name: label || `${adapter.name} Profile`,
         email: email || "unknown@session",
         websiteId: adapter.id,
         websiteDomain: adapter.domain,
@@ -764,7 +780,7 @@ function CapturePanel({ adapter }: { adapter: any }) {
       setTimeout(() => {
         setIsOpen(false);
         setStatus("idle");
-      }, 1500);
+      }, 1200);
     } catch (err) {
       console.error(err);
       setStatus("error");
@@ -775,59 +791,56 @@ function CapturePanel({ adapter }: { adapter: any }) {
 
   if (!isOpen) {
     return (
-      <div className="p-3 rounded-xl border border-indigo-500/20 bg-indigo-950/15 backdrop-blur-md flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+      <div className="p-3 rounded-lg border border-amber-500/25 bg-[#121622] flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           <div className="space-y-0.5">
-            <h4 className="text-[11px] font-bold text-indigo-300">
-              Active: {adapter.name}
+            <h4 className="text-[11px] font-bold font-mono text-white">
+              Target: {adapter.name}
             </h4>
-            <p className="text-[9px] text-slate-400">
-              You are on a supported website page.
+            <p className="text-[9px] font-mono text-slate-400">
+              Active session available for capture
             </p>
           </div>
         </div>
 
         <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-colors select-none active:scale-95 shadow-md shadow-indigo-600/10 cursor-pointer"
+          className="flex items-center gap-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1.5 rounded transition-colors select-none cursor-pointer shadow-sm shadow-amber-500/20"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Capture Profile</span>
+          <span>Capture</span>
         </button>
       </div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 5 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-4 rounded-xl border border-indigo-500/25 bg-slate-900/40 backdrop-blur-md space-y-3 relative overflow-hidden"
-    >
-      <div className="flex items-center justify-between border-b border-white/5 pb-2">
-        <h4 className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+    <div className="p-3.5 rounded-lg border border-amber-500/30 bg-[#0f131c] space-y-3">
+      <div className="flex items-center justify-between border-b border-white/10 pb-2">
+        <h4 className="text-[11px] font-mono font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+          <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
           Save {adapter.name} Session
         </h4>
         <button 
           onClick={() => setIsOpen(false)}
-          className="p-1 rounded-md hover:bg-white/5 text-slate-500 hover:text-white"
+          className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+          aria-label="Cancel session capture"
         >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {status === "success" ? (
-        <div className="py-6 text-center space-y-2">
-          <CheckCircle className="w-8 h-8 text-emerald-400 animate-bounce mx-auto" />
-          <h4 className="text-xs font-semibold text-white">Session Captured!</h4>
-          <p className="text-[10px] text-slate-400">Profile encrypted and saved securely.</p>
+        <div className="py-4 text-center space-y-1.5 font-mono">
+          <CheckCircle className="w-6 h-6 text-emerald-400 mx-auto" />
+          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Session Encrypted</h4>
+          <p className="text-[10px] text-slate-400">Profile saved to encrypted vault.</p>
         </div>
       ) : (
         <form onSubmit={handleCapture} className="space-y-3">
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">
+            <label className="text-[9px] font-mono uppercase font-semibold text-slate-400 tracking-wider">
               Profile Label
             </label>
             <input
@@ -835,28 +848,28 @@ function CapturePanel({ adapter }: { adapter: any }) {
               required
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g. Work, Personal, Shared"
-              className="w-full px-2 py-1.5 bg-slate-950 border border-white/10 rounded-md text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder="e.g. Primary, Dev Team, Client"
+              className="w-full px-2.5 py-1.5 bg-[#090b10] border border-white/10 rounded-md text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-colors"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">
-              Email / Identifier
+            <label className="text-[9px] font-mono uppercase font-semibold text-slate-400 tracking-wider">
+              Account Identifier
             </label>
             <input
-              type="email"
+              type="text"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. user@workmail.com"
-              className="w-full px-2 py-1.5 bg-slate-950 border border-white/10 rounded-md text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder="e.g. dev@company.org"
+              className="w-full px-2.5 py-1.5 bg-[#090b10] border border-white/10 rounded-md text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-colors"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider block">
-              Color Theme
+            <label className="text-[9px] font-mono uppercase font-semibold text-slate-400 tracking-wider block">
+              Color Tag
             </label>
             <div className="flex gap-1.5 pt-0.5">
               {colors.map((c) => (
@@ -865,50 +878,50 @@ function CapturePanel({ adapter }: { adapter: any }) {
                   type="button"
                   onClick={() => setColor(c)}
                   className={cn(
-                    "w-4 h-4 rounded-full border border-white/10 transition-transform",
-                    c === "indigo" && "bg-indigo-500",
-                    c === "violet" && "bg-violet-500",
-                    c === "emerald" && "bg-emerald-500",
+                    "w-4 h-4 rounded-full border border-white/20 transition-transform cursor-pointer",
                     c === "amber" && "bg-amber-500",
-                    c === "rose" && "bg-rose-500",
+                    c === "emerald" && "bg-emerald-500",
                     c === "cyan" && "bg-cyan-500",
-                    c === "fuchsia" && "bg-fuchsia-500",
+                    c === "blue" && "bg-blue-500",
+                    c === "rose" && "bg-rose-500",
+                    c === "slate" && "bg-slate-500",
                     color === c && "scale-125 ring-2 ring-white"
                   )}
+                  aria-label={`Select color ${c}`}
                 />
               ))}
             </div>
           </div>
 
           {status === "error" && (
-            <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[9px] flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>Failed to capture active session. Make sure you are logged in.</span>
+            <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-300 font-mono text-[9px] flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-rose-400" />
+              <span>Failed to capture session. Ensure you are signed in on {adapter.name}.</span>
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white text-xs py-2 rounded-lg font-semibold transition-colors shadow-md shadow-indigo-600/10 cursor-pointer"
+            className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-mono font-bold uppercase tracking-wider py-2 rounded transition-colors cursor-pointer shadow-sm shadow-amber-500/20"
           >
             {loading ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-950" />
             ) : (
               <>
                 <Upload className="w-3.5 h-3.5" />
-                <span>Encrypt & Save Session</span>
+                <span>Encrypt & Save</span>
               </>
             )}
           </button>
         </form>
       )}
-    </motion.div>
+    </div>
   );
 }
 
 /* ============================================================================
-   VIEW 4: Settings (Backups, Encryption management)
+   VIEW 4: Settings (Backups, Security, Custom Websites)
    ============================================================================ */
 function SettingsView() {
   const { exportBackup, importBackup, lock, customSites, addCustomSite, deleteCustomSite } = useStore();
@@ -932,7 +945,7 @@ function SettingsView() {
     setStatus("idle");
 
     if (backupPassword.length < 8) {
-      setErrorMsg("Password must be at least 8 characters.");
+      setErrorMsg("Backup password requires at least 8 characters.");
       return;
     }
 
@@ -943,7 +956,7 @@ function SettingsView() {
     } catch (err) {
       console.error(err);
       setStatus("error");
-      setErrorMsg("Export failed.");
+      setErrorMsg("Backup export failed.");
     }
   };
 
@@ -953,7 +966,7 @@ function SettingsView() {
     setStatus("idle");
 
     if (!backupStr.trim()) {
-      setErrorMsg("Please paste the backup string.");
+      setErrorMsg("Please paste the encrypted backup string.");
       return;
     }
 
@@ -965,7 +978,7 @@ function SettingsView() {
         setBackupPassword("");
       } else {
         setStatus("error");
-        setErrorMsg("Import failed. Check password or backup string integrity.");
+        setErrorMsg("Import failed. Verify password or backup payload.");
       }
     } catch (err) {
       setStatus("error");
@@ -979,7 +992,7 @@ function SettingsView() {
     setSiteSuccess(false);
 
     if (!siteName.trim() || !siteDomain.trim()) {
-      setSiteError("All fields are required.");
+      setSiteError("Both site name and domain are required.");
       return;
     }
 
@@ -1002,24 +1015,24 @@ function SettingsView() {
       setSiteDomain("");
       setTimeout(() => setSiteSuccess(false), 2000);
     } else {
-      setSiteError("Permission rejected or invalid domain.");
+      setSiteError("Host permission rejected or invalid domain.");
     }
   };
 
   return (
-    <div className="space-y-4 pb-8 select-none text-slate-300">
+    <div className="space-y-3 pb-8 select-none text-slate-300 font-sans">
       {/* Custom Sites Management */}
-      <div className="p-4 rounded-xl border border-white/5 bg-slate-900/10 space-y-4">
-        <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
-          <Globe className="w-4 h-4 text-indigo-400" />
+      <div className="p-3.5 rounded-lg border border-white/10 bg-[#0d1017] space-y-3">
+        <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+          <Globe className="w-3.5 h-3.5 text-amber-400" />
           Custom Websites
         </h3>
         
-        <form onSubmit={handleAddSite} className="space-y-3">
+        <form onSubmit={handleAddSite} className="space-y-2.5">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">
-                Website Name
+              <label className="text-[9px] font-mono uppercase font-semibold text-slate-400 tracking-wider">
+                Site Name
               </label>
               <input
                 type="text"
@@ -1027,62 +1040,63 @@ function SettingsView() {
                 value={siteName}
                 onChange={(e) => setSiteName(e.target.value)}
                 placeholder="e.g. My Workspace"
-                className="w-full px-2.5 py-1.5 bg-slate-950/60 border border-white/5 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full px-2.5 py-1.5 bg-[#090b10] border border-white/10 rounded-md text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-colors"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">
-                Domain Name
+              <label className="text-[9px] font-mono uppercase font-semibold text-slate-400 tracking-wider">
+                Domain
               </label>
               <input
                 type="text"
                 required
                 value={siteDomain}
                 onChange={(e) => setSiteDomain(e.target.value)}
-                placeholder="e.g. workspace.com"
-                className="w-full px-2.5 py-1.5 bg-slate-950/60 border border-white/5 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="e.g. workspace.internal"
+                className="w-full px-2.5 py-1.5 bg-[#090b10] border border-white/10 rounded-md text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-colors"
               />
             </div>
           </div>
 
           {siteError && (
-            <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[9px] flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5" />
+            <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-300 font-mono text-[9px] flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
               <span>{siteError}</span>
             </div>
           )}
 
           {siteSuccess && (
-            <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] flex items-center gap-1">
-              <CheckCircle className="w-3.5 h-3.5" />
-              <span>Site registered successfully!</span>
+            <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-mono text-[9px] flex items-center gap-1">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Custom domain registered.</span>
             </div>
           )}
 
           <button
             type="submit"
             disabled={sitePending}
-            className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-700 text-white rounded-lg text-xs font-semibold cursor-pointer select-none active:scale-95 transition-all"
+            className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 rounded-md text-xs font-mono font-bold uppercase tracking-wider cursor-pointer transition-colors"
           >
-            {sitePending ? "Requesting host permission..." : "Register Site & Request Permissions"}
+            {sitePending ? "Requesting permission..." : "Register Site Domain"}
           </button>
         </form>
 
         {customSites.length > 0 && (
-          <div className="space-y-1.5 border-t border-white/5 pt-3">
-            <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+          <div className="space-y-1.5 border-t border-white/10 pt-2.5">
+            <p className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider">
               Registered Custom Sites
             </p>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
               {customSites.map((site) => (
-                <div key={site.id} className="flex items-center justify-between p-2 rounded bg-slate-950/40 border border-white/5 text-[10px]">
+                <div key={site.id} className="flex items-center justify-between p-2 rounded bg-[#090b10] border border-white/5 font-mono text-[10px]">
                   <div>
                     <span className="font-semibold text-white">{site.name}</span>
                     <span className="text-[8px] text-slate-500 ml-1.5">({site.domain})</span>
                   </div>
                   <button
                     onClick={() => deleteCustomSite(site.id)}
-                    className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    aria-label={`Delete custom site ${site.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -1093,111 +1107,106 @@ function SettingsView() {
         )}
       </div>
 
-      {/* Encryption Details */}
-      <div className="p-3.5 rounded-xl border border-white/5 bg-slate-900/10 space-y-2">
-        <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
-          <Key className="w-4 h-4 text-indigo-400" />
+      {/* Security Architecture */}
+      <div className="p-3.5 rounded-lg border border-white/10 bg-[#0d1017] space-y-2">
+        <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+          <Key className="w-3.5 h-3.5 text-amber-400" />
           Security Architecture
         </h3>
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          Your credentials and cookies are encrypted with <strong className="text-indigo-400">AES-GCM-256</strong>. 
-          The cryptographic key is derived at runtime using <strong className="text-indigo-400">PBKDF2</strong> with 100,000 iterations.
+        <p className="text-[10px] font-mono text-slate-400 leading-relaxed">
+          Sessions encrypted using <strong className="text-amber-400">AES-GCM-256</strong> with key derivation via <strong className="text-amber-400">PBKDF2</strong> (100,000 iterations). Master key stays in memory during active browser session.
         </p>
       </div>
 
-      {/* Backup Section */}
-      <div className="p-4 rounded-xl border border-white/5 bg-slate-900/10 space-y-4">
-        <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
-          <FileJson className="w-4 h-4 text-indigo-400" />
+      {/* Encrypted Backups */}
+      <div className="p-3.5 rounded-lg border border-white/10 bg-[#0d1017] space-y-3">
+        <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+          <FileJson className="w-3.5 h-3.5 text-amber-400" />
           Encrypted Backups
         </h3>
         
-        <div className="space-y-3">
-          {/* Password fields */}
+        <div className="space-y-2.5">
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">
-              Backup Password
+            <label className="text-[9px] font-mono uppercase font-semibold text-slate-400 tracking-wider">
+              Backup Passphrase
             </label>
             <div className="relative">
               <input
                 type={showPass ? "text" : "password"}
                 value={backupPassword}
                 onChange={(e) => setBackupPassword(e.target.value)}
-                placeholder="Enter password for export/import"
-                className="w-full px-3 py-1.5 bg-slate-950/60 border border-white/5 rounded-lg text-xs text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                placeholder="Passphrase for export/import"
+                className="w-full px-2.5 py-1.5 bg-[#090b10] border border-white/10 rounded-md text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 focus:ring-1 focus:ring-amber-500/60 transition-colors"
               />
               <button
                 type="button"
+                aria-label={showPass ? "Hide passphrase" : "Show passphrase"}
                 onClick={() => setShowPass(!showPass)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
               >
-                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
             </div>
           </div>
 
           {errorMsg && (
-            <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[9px] flex items-center gap-1">
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+            <div className="p-2 rounded bg-rose-500/10 border border-rose-500/20 text-rose-300 font-mono text-[9px] flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-rose-400" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {status === "success" && (
-            <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] flex items-center gap-1">
-              <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>Operation succeeded!</span>
+            <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 font-mono text-[9px] flex items-center gap-1">
+              <CheckCircle className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
+              <span>Backup operation completed.</span>
             </div>
           )}
 
-          {/* Action buttons */}
-          <div className="flex gap-2">
-            <button
-              onClick={handleExport}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold py-2 rounded-lg cursor-pointer transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Generate Backup</span>
-            </button>
-          </div>
+          <button
+            onClick={handleExport}
+            className="w-full flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/15 text-white text-xs font-mono font-medium py-1.5 rounded-md cursor-pointer transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Generate Encrypted Backup</span>
+          </button>
         </div>
 
-        {/* Export Results */}
         {exportedResult && (
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider">
-              Backup Payload (Copy and save safely)
+            <label className="text-[9px] font-mono uppercase font-semibold text-slate-400 tracking-wider">
+              Backup Payload (Encrypted)
             </label>
             <textarea
               readOnly
               value={exportedResult}
               onClick={(e) => (e.target as any).select()}
-              className="w-full h-16 px-2 py-1 bg-slate-950 border border-white/5 rounded-md text-[9px] font-mono text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none select-all"
+              className="w-full h-16 px-2 py-1 bg-[#090b10] border border-white/10 rounded-md text-[9px] font-mono text-slate-300 focus:outline-none focus:border-amber-500/50 resize-none select-all"
             />
           </div>
         )}
 
         {/* Import Area */}
-        <form onSubmit={handleImport} className="space-y-2 border-t border-white/5 pt-3">
+        <form onSubmit={handleImport} className="space-y-2 border-t border-white/10 pt-2.5">
           <div className="space-y-1">
-            <label className="text-[9px] uppercase font-semibold text-slate-500 tracking-wider block">
+            <label className="text-[9px] font-mono uppercase font-semibold text-slate-400 tracking-wider block">
               Restore from Backup
             </label>
             <textarea
               required
               value={backupStr}
               onChange={(e) => setBackupStr(e.target.value)}
-              placeholder="Paste encrypted backup string here..."
-              className="w-full h-16 px-2 py-1 bg-slate-950 border border-white/5 rounded-md text-[9px] font-mono text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
+              placeholder="Paste encrypted payload here..."
+              className="w-full h-16 px-2 py-1 bg-[#090b10] border border-white/10 rounded-md text-[9px] font-mono text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/60 resize-none"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 rounded-lg cursor-pointer transition-colors shadow-md shadow-indigo-600/10"
+            className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-mono font-bold uppercase tracking-wider py-1.5 rounded-md cursor-pointer transition-colors"
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Import & Decrypt Backup</span>
+            <span>Restore Backup</span>
           </button>
         </form>
       </div>
@@ -1205,7 +1214,7 @@ function SettingsView() {
       {/* Lock panel button */}
       <button
         onClick={lock}
-        className="w-full py-2 border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/15 text-rose-400 font-semibold rounded-lg text-xs transition-colors cursor-pointer"
+        className="w-full py-2 border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-mono font-bold text-xs uppercase tracking-wider rounded-md transition-colors cursor-pointer"
       >
         Lock Session Database
       </button>

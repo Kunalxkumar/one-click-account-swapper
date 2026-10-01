@@ -1,12 +1,15 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   output: "export",
   images: {
     unoptimized: true,
   },
-  // Ensure that source maps are disabled or handled correctly for production
   productionBrowserSourceMaps: false,
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
 };
 
 export default nextConfig;

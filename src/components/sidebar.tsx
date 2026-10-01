@@ -4,13 +4,13 @@ import React from "react";
 import { 
   FolderHeart, 
   Settings, 
-  Grid, 
+  Layers, 
   Pin, 
-  LogOut, 
-  ShieldAlert,
+  Lock, 
+  ExternalLink,
   ChevronLeft,
-  ChevronRight,
-  Database
+  KeyRound,
+  ShieldCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
@@ -26,21 +26,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
   const { 
     selectedCategory, 
     activeView, 
-    accounts,
-    lock,
-    activeSessions
+    accounts, 
+    lock 
   } = useStore();
 
-  // Categories list
   const navItems = [
-    { id: "all", label: "All Accounts", icon: Grid },
-    { id: "pinned", label: "Pinned", icon: Pin },
+    { id: "all", label: "All Sessions", icon: Layers },
+    { id: "pinned", label: "Pinned Quick-Access", icon: Pin },
     { id: "favorites", label: "Favorites", icon: FolderHeart },
   ];
 
-  // Get list of websites that actually have accounts saved
+  // Unique websites with saved profiles
   const activeWebsites = Array.from(new Set(accounts.map((acc) => acc.websiteId)))
-    .map(id => adapters[id])
+    .map((id) => adapters[id])
     .filter(Boolean);
 
   const handleNavClick = (id: string, view: "dashboard" | "settings") => {
@@ -54,24 +52,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
   };
 
   const SidebarContent = (
-    <div className="flex flex-col h-full bg-slate-900/40 backdrop-blur-md border-r border-white/5 select-none text-slate-300">
-      {/* App Header */}
-      <div className="p-4 border-b border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <Database className="w-4 h-4 text-white animate-pulse" />
+    <div className="flex flex-col h-full bg-[#0d1017] border-r border-[#202534] select-none text-slate-300">
+      {/* App Header: Tactical Vault Brand */}
+      <div className="p-3.5 border-b border-[#202534] flex items-center justify-between bg-[#0a0c12]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+            <KeyRound className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div>
-            <h1 className="font-bold text-sm bg-gradient-to-r from-indigo-200 to-violet-200 bg-clip-text text-transparent">
-              Swapper
-            </h1>
-            <p className="text-[10px] text-slate-500">v1.0.0 (Secure)</p>
+            <div className="flex items-center gap-1.5">
+              <h1 className="font-bold text-xs tracking-wider text-slate-100 uppercase">
+                VaultKey
+              </h1>
+              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                PRO
+              </span>
+            </div>
+            <p className="text-[9px] font-mono text-slate-500 flex items-center gap-1">
+              <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+              AES-256 GCM
+            </p>
           </div>
         </div>
         {isResponsive && (
           <button 
             onClick={() => setIsOpen(false)}
-            className="p-1 rounded-md hover:bg-white/10 text-slate-400"
+            className="p-1 rounded hover:bg-white/5 text-slate-400 hover:text-white"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -79,44 +85,38 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
       </div>
 
       {/* Nav List */}
-      <div className="flex-1 overflow-y-auto py-4 px-2 space-y-6">
+      <div className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
         {/* Navigation Categories */}
-        <div className="space-y-1">
-          <p className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-            Categories
+        <div className="space-y-0.5">
+          <p className="px-2.5 py-1 text-[9px] font-mono uppercase font-semibold text-slate-500 tracking-wider">
+            Navigation
           </p>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === "dashboard" && selectedCategory === item.id;
+            let count = 0;
+            if (item.id === "all") count = accounts.length;
+            if (item.id === "pinned") count = accounts.filter((a) => a.isPinned).length;
+            if (item.id === "favorites") count = accounts.filter((a) => a.isFavorite).length;
+
             return (
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id, "dashboard")}
                 className={cn(
-                  "w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all duration-200 group text-left",
+                  "w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-colors duration-150 group text-left",
                   isActive
-                    ? "bg-indigo-600/20 text-indigo-200 border-l-2 border-indigo-500 font-medium"
-                    : "hover:bg-white/5 hover:text-white"
+                    ? "bg-amber-500/10 text-amber-300 font-semibold border-l-2 border-amber-500"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <Icon className={cn("w-4 h-4", isActive ? "text-indigo-400" : "text-slate-400 group-hover:text-white")} />
+                  <Icon className={cn("w-3.5 h-3.5", isActive ? "text-amber-400" : "text-slate-400 group-hover:text-slate-200")} />
                   <span>{item.label}</span>
                 </div>
-                {/* Count badge */}
-                {item.id === "all" && accounts.length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                    {accounts.length}
-                  </span>
-                )}
-                {item.id === "pinned" && accounts.filter(a => a.isPinned).length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                    {accounts.filter(a => a.isPinned).length}
-                  </span>
-                )}
-                {item.id === "favorites" && accounts.filter(a => a.isFavorite).length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                    {accounts.filter(a => a.isFavorite).length}
+                {count > 0 && (
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/[0.06] border border-white/[0.08] text-slate-400">
+                    {count}
                   </span>
                 )}
               </button>
@@ -124,28 +124,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
           })}
         </div>
 
-        {/* Websites List */}
+        {/* Saved Websites Filter */}
         {activeWebsites.length > 0 && (
-          <div className="space-y-1">
-            <p className="px-3 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-              Websites
+          <div className="space-y-0.5">
+            <p className="px-2.5 py-1 text-[9px] font-mono uppercase font-semibold text-slate-500 tracking-wider">
+              Connected Sites
             </p>
             {activeWebsites.map((web) => {
               const isActive = activeView === "dashboard" && selectedCategory === web.id;
-              const webAccounts = accounts.filter(a => a.websiteId === web.id);
+              const webAccounts = accounts.filter((a) => a.websiteId === web.id);
               return (
                 <button
                   key={web.id}
                   onClick={() => handleNavClick(web.id, "dashboard")}
                   className={cn(
-                    "w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-all duration-200 text-left",
+                    "w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors duration-150 text-left",
                     isActive
-                      ? "bg-indigo-600/20 text-indigo-200 border-l-2 border-indigo-500 font-medium"
-                      : "hover:bg-white/5 hover:text-white"
+                      ? "bg-amber-500/10 text-amber-300 font-semibold border-l-2 border-amber-500"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"
                   )}
                 >
                   <span className="truncate">{web.name}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/[0.06] border border-white/[0.08] text-slate-400">
                     {webAccounts.length}
                   </span>
                 </button>
@@ -155,27 +155,41 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
         )}
       </div>
 
-      {/* Footer / Settings */}
-      <div className="p-4 border-t border-white/5 space-y-2">
+      {/* Footer Controls */}
+      <div className="p-3 border-t border-[#202534] bg-[#0a0c12] space-y-1.5">
         <button
           onClick={() => handleNavClick("settings", "settings")}
           className={cn(
-            "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all text-left",
+            "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-colors text-left",
             activeView === "settings"
-              ? "bg-white/10 text-white font-medium"
-              : "hover:bg-white/5 hover:text-white"
+              ? "bg-white/[0.08] text-white font-medium border border-white/10"
+              : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"
           )}
         >
-          <Settings className="w-4 h-4 text-slate-400" />
-          <span>Settings</span>
+          <Settings className="w-3.5 h-3.5 text-slate-400" />
+          <span>Vault Settings</span>
         </button>
+
+        {isResponsive && (
+          <button
+            onClick={() => {
+              if (typeof chrome !== "undefined" && chrome.tabs?.create && chrome.runtime?.getURL) {
+                chrome.tabs.create({ url: chrome.runtime.getURL("index.html") });
+              }
+            }}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] transition-colors text-left"
+          >
+            <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+            <span>Open Full Dashboard</span>
+          </button>
+        )}
 
         <button
           onClick={lock}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 transition-all text-left"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all text-left"
         >
-          <LogOut className="w-4 h-4 text-rose-400" />
-          <span>Lock Swapper</span>
+          <Lock className="w-3.5 h-3.5 text-rose-400" />
+          <span>Lock Vault</span>
         </button>
       </div>
     </div>
@@ -184,17 +198,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
   if (isResponsive) {
     return (
       <>
-        {/* Backdrop */}
         {isOpen && (
           <div 
             onClick={() => setIsOpen(false)}
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-xs"
           />
         )}
-        {/* Side Drawer */}
         <div 
           className={cn(
-            "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out",
+            "fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ease-in-out",
             isOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
@@ -205,7 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
   }
 
   return (
-    <div className="w-64 h-full flex-shrink-0">
+    <div className="w-60 h-full flex-shrink-0">
       {SidebarContent}
     </div>
   );

@@ -55,6 +55,83 @@ interface ExtensionState {
   deleteCustomSite: (id: string) => Promise<void>;
 }
 
+// Resilient storage helpers with browser fallbacks
+const storageLocal = {
+  get: (keys: string[], cb: (res: any) => void) => {
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      chrome.storage.local.get(keys, cb);
+    } else {
+      const data: any = {};
+      keys.forEach((k) => {
+        try {
+          const val = typeof window !== "undefined" ? window.localStorage.getItem(`swapper_${k}`) : null;
+          if (val) data[k] = JSON.parse(val);
+        } catch {}
+      });
+      cb(data);
+    }
+  },
+  set: (items: Record<string, any>, cb?: () => void) => {
+    if (typeof chrome !== "undefined" && chrome.storage?.local) {
+      chrome.storage.local.set(items, () => cb?.());
+    } else {
+      if (typeof window !== "undefined") {
+        Object.entries(items).forEach(([k, v]) => {
+          try {
+            window.localStorage.setItem(`swapper_${k}`, JSON.stringify(v));
+          } catch {}
+        });
+      }
+      cb?.();
+    }
+  },
+};
+
+const storageSession = {
+  get: (keys: string[], cb: (res: any) => void) => {
+    if (typeof chrome !== "undefined" && chrome.storage?.session) {
+      chrome.storage.session.get(keys, cb);
+    } else {
+      const data: any = {};
+      keys.forEach((k) => {
+        try {
+          const val = typeof window !== "undefined" ? window.sessionStorage.getItem(`swapper_${k}`) : null;
+          if (val) data[k] = JSON.parse(val);
+        } catch {}
+      });
+      cb(data);
+    }
+  },
+  set: (items: Record<string, any>, cb?: () => void) => {
+    if (typeof chrome !== "undefined" && chrome.storage?.session) {
+      chrome.storage.session.set(items, () => cb?.());
+    } else {
+      if (typeof window !== "undefined") {
+        Object.entries(items).forEach(([k, v]) => {
+          try {
+            window.sessionStorage.setItem(`swapper_${k}`, JSON.stringify(v));
+          } catch {}
+        });
+      }
+      cb?.();
+    }
+  },
+  remove: (keys: string[], cb?: () => void) => {
+    if (typeof chrome !== "undefined" && chrome.storage?.session) {
+      chrome.storage.session.remove(keys, () => cb?.());
+    } else {
+      if (typeof window !== "undefined") {
+        keys.forEach((k) => {
+          try {
+            window.sessionStorage.removeItem(`swapper_${k}`);
+          } catch {}
+        });
+      }
+      cb?.();
+    }
+  },
+};
+
 export const useStore = create<ExtensionState>((set, get) => ({
   isUnlocked: false,
   hasMasterPassword: false,
@@ -71,48 +148,58 @@ export const useStore = create<ExtensionState>((set, get) => ({
 
   init: async () => {
     return new Promise((resolve) => {
-      // 1. Fetch current active tab URL and ID
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs[0];
-        if (activeTab) {
-          set({
-            currentTabUrl: activeTab.url || null,
-            currentTabId: activeTab.id || null,
-          });
-        }
+      // 1. Fetch current active tab URL and ID safely
+      if (typeof chrome !== "undefined" && chrome.tabs?.query) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          const activeTab = tabs?.[0];
+          if (activeTab) {
+            set({
+              currentTabUrl: activeTab.url || null,
+              currentTabId: activeTab.id || null,
+            });
+          }
+        });
+      }
 
-        // 2. Fetch local storage state
-        chrome.storage.local.get(
-          ["accounts", "hasMasterPassword", "activeSessions", "passwordVerifyPayload", "customSites"],
-          async (result) => {
-            const hasMasterPassword = !!result.hasMasterPassword;
-            const accounts = (result.accounts || []) as Account[];
-            const activeSessions = (result.activeSessions || {}) as Record<string, string>;
-            const customSites = (result.customSites || []) as { id: string; name: string; domain: string; icon: string }[];
+      // 2. Fetch persistent storage state
+      storageLocal.get(
+        ["accounts", "hasMasterPassword", "activeSessions", "passwordVerifyPayload", "customSites"],
+        async (result) => {
+          const hasMasterPassword = !!result.hasMasterPassword;
+          const accounts = (result.accounts || []) as Account[];
+          const activeSessions = (result.activeSessions || {}) as Record<string, string>;
+          const customSites = (result.customSites || []) as { id: string; name: string; domain: string; icon: string }[];
 
-            // Dynamically register custom sites into the adapters list
-            try {
-              const { adapters, BaseAdapter } = await import("../adapters");
-              for (const site of customSites) {
-                if (!adapters[site.id]) {
-                  adapters[site.id] = new BaseAdapter(site.id, site.name, site.domain, site.icon || "Globe");
-                }
+          // Dynamically register custom sites into the adapters list
+          try {
+            const { adapters, BaseAdapter } = await import("../adapters");
+            for (const site of customSites) {
+              if (!adapters[site.id]) {
+                adapters[site.id] = new BaseAdapter(site.id, site.name, site.domain, site.icon || "Globe");
               }
-            } catch (err) {
-              console.error("Failed to load custom adapters on init:", err);
             }
+          } catch (err) {
+            console.error("Failed to load custom adapters on init:", err);
+          }
+
+          // Check if session master password is kept in RAM session storage
+          storageSession.get(["sessionMasterPassword"], (sessionRes) => {
+            const cachedPassword = sessionRes?.sessionMasterPassword || null;
+            const isUnlocked = !!(hasMasterPassword && cachedPassword);
 
             set({
               hasMasterPassword,
+              isUnlocked,
+              masterPassword: cachedPassword,
               accounts,
               activeSessions,
               customSites,
-              activeView: hasMasterPassword ? "unlock" : "setup_password",
+              activeView: hasMasterPassword ? (isUnlocked ? "dashboard" : "unlock") : "setup_password",
             });
             resolve();
-          }
-        );
-      });
+          });
+        }
+      );
     });
   },
 
@@ -122,7 +209,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
     const encryptedVerify = await encryptData(verifyPayload, password);
 
     return new Promise((resolve) => {
-      chrome.storage.local.set(
+      storageLocal.set(
         {
           hasMasterPassword: true,
           passwordVerifyPayload: encryptedVerify,
@@ -130,6 +217,9 @@ export const useStore = create<ExtensionState>((set, get) => ({
           activeSessions: {},
         },
         () => {
+          // Cache in RAM session storage
+          storageSession.set({ sessionMasterPassword: password });
+
           set({
             hasMasterPassword: true,
             isUnlocked: true,
@@ -146,7 +236,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
 
   unlock: async (password: string): Promise<boolean> => {
     return new Promise((resolve) => {
-      chrome.storage.local.get(["passwordVerifyPayload"], async (result) => {
+      storageLocal.get(["passwordVerifyPayload"], async (result) => {
         const payload = result.passwordVerifyPayload as string;
         if (!payload) {
           resolve(false);
@@ -156,6 +246,9 @@ export const useStore = create<ExtensionState>((set, get) => ({
         try {
           const decrypted = await decryptData(payload, password);
           if (decrypted === "VERIFY_KEY_SWAPPER") {
+            // Cache in RAM session storage for the remainder of this browser session
+            storageSession.set({ sessionMasterPassword: password });
+
             set({
               isUnlocked: true,
               masterPassword: password,
@@ -173,6 +266,9 @@ export const useStore = create<ExtensionState>((set, get) => ({
   },
 
   lock: () => {
+    // Purge cached password from RAM session storage immediately
+    storageSession.remove(["sessionMasterPassword"]);
+
     set({
       isUnlocked: false,
       masterPassword: null,
@@ -200,7 +296,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
 
     const newAccount: Account = {
       ...accountData,
-      id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+      id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
       lastUsed: Date.now(),
       encryptedSession,
       expiresAt,
@@ -208,7 +304,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
 
     return new Promise((resolve) => {
       const updatedAccounts = [...get().accounts, newAccount];
-      chrome.storage.local.set({ accounts: updatedAccounts }, () => {
+      storageLocal.set({ accounts: updatedAccounts }, () => {
         set({ accounts: updatedAccounts });
         resolve();
       });
@@ -227,7 +323,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
         }
       }
 
-      chrome.storage.local.set({ accounts: updatedAccounts, activeSessions }, () => {
+      storageLocal.set({ accounts: updatedAccounts, activeSessions }, () => {
         set({ accounts: updatedAccounts, activeSessions });
         resolve();
       });
@@ -239,7 +335,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
       const updatedAccounts = get().accounts.map((acc) =>
         acc.id === id ? { ...acc, isPinned: !acc.isPinned } : acc
       );
-      chrome.storage.local.set({ accounts: updatedAccounts }, () => {
+      storageLocal.set({ accounts: updatedAccounts }, () => {
         set({ accounts: updatedAccounts });
         resolve();
       });
@@ -251,7 +347,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
       const updatedAccounts = get().accounts.map((acc) =>
         acc.id === id ? { ...acc, isFavorite: !acc.isFavorite } : acc
       );
-      chrome.storage.local.set({ accounts: updatedAccounts }, () => {
+      storageLocal.set({ accounts: updatedAccounts }, () => {
         set({ accounts: updatedAccounts });
         resolve();
       });
@@ -263,7 +359,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
       const updatedAccounts = get().accounts.map((acc) =>
         acc.id === id ? { ...acc, name: newLabel, email: newEmail, color: newColor } : acc
       );
-      chrome.storage.local.set({ accounts: updatedAccounts }, () => {
+      storageLocal.set({ accounts: updatedAccounts }, () => {
         set({ accounts: updatedAccounts });
         resolve();
       });
@@ -289,7 +385,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
 
       // 2. Fetch adapter
       const { getAdapterForUrl } = await import("../adapters");
-      const adapter = getAdapterForUrl(get().currentTabUrl || "");
+      const adapter = getAdapterForUrl(get().currentTabUrl || `https://${account.websiteDomain}`);
       if (!adapter) {
         console.error("No adapter matches current URL");
         set({ swappingAccount: null });
@@ -310,7 +406,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
       };
 
       return new Promise<void>((resolve) => {
-        chrome.storage.local.set(
+        storageLocal.set(
           {
             accounts: updatedAccounts,
             activeSessions,
@@ -323,9 +419,13 @@ export const useStore = create<ExtensionState>((set, get) => ({
             });
 
             // 5. Reload active tab to apply session changes
-            chrome.tabs.reload(tabId, {}, () => {
+            if (typeof chrome !== "undefined" && chrome.tabs?.reload) {
+              chrome.tabs.reload(tabId, {}, () => {
+                resolve();
+              });
+            } else {
               resolve();
-            });
+            }
           }
         );
       });
@@ -339,8 +439,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
     const localPassword = get().masterPassword;
     if (!localPassword) throw new Error("Wallet is locked");
 
-    // Create backup file payload (accounts list)
-    // Decrypt all accounts with current localPassword, and re-encrypt with backup password (if different, or just use masterPassword)
+    // Decrypt all accounts with current localPassword
     const decryptedAccounts = [];
     for (const acc of get().accounts) {
       const decSession = await decryptData(acc.encryptedSession, localPassword);
@@ -384,7 +483,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
         );
 
         importedAccounts.push({
-          id: acc.id || crypto.randomUUID(),
+          id: acc.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString()),
           name: acc.name,
           email: acc.email,
           websiteId: acc.websiteId,
@@ -401,12 +500,11 @@ export const useStore = create<ExtensionState>((set, get) => ({
 
       // Merge imported accounts with existing
       const existing = get().accounts;
-      // Filter out duplicate ids
       const filteredExisting = existing.filter((e) => !importedAccounts.some((i) => i.id === e.id));
       const mergedAccounts = [...filteredExisting, ...importedAccounts];
 
       return new Promise((resolve) => {
-        chrome.storage.local.set({ accounts: mergedAccounts }, () => {
+        storageLocal.set({ accounts: mergedAccounts }, () => {
           set({ accounts: mergedAccounts });
           resolve(true);
         });
@@ -430,12 +528,12 @@ export const useStore = create<ExtensionState>((set, get) => ({
     
     // Request permission from Chrome dynamically
     const granted = await new Promise<boolean>((resolve) => {
-      if (typeof chrome !== "undefined" && chrome.permissions) {
+      if (typeof chrome !== "undefined" && chrome.permissions?.request) {
         chrome.permissions.request({ origins: [hostPattern] }, (res) => {
           resolve(!!res);
         });
       } else {
-        // Mock permission in local development browser environment
+        // Fallback in test/dev environment
         resolve(true);
       }
     });
@@ -456,7 +554,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
 
     const customSites = [...get().customSites, newSite];
     return new Promise((resolve) => {
-      chrome.storage.local.set({ customSites }, () => {
+      storageLocal.set({ customSites }, () => {
         set({ customSites });
         resolve(true);
       });
@@ -475,7 +573,7 @@ export const useStore = create<ExtensionState>((set, get) => ({
     }
 
     return new Promise((resolve) => {
-      chrome.storage.local.set({ customSites }, () => {
+      storageLocal.set({ customSites }, () => {
         set({ customSites });
         resolve();
       });

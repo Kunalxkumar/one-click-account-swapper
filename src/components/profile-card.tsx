@@ -8,13 +8,13 @@ import {
   RefreshCw, 
   Check, 
   ExternalLink,
-  Edit2,
+  Edit3,
   Clock,
-  Sparkles,
   Save,
-  Info
+  Terminal,
+  ShieldAlert
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Account, useStore } from "@/lib/store";
 
@@ -24,14 +24,13 @@ interface ProfileCardProps {
   onInspect?: () => void;
 }
 
-const colorMap: Record<string, { border: string; bg: string; text: string; accent: string; glow: string }> = {
-  emerald: { border: "border-emerald-500/20 hover:border-emerald-500/40", bg: "bg-emerald-500/10", text: "text-emerald-400", accent: "bg-emerald-500", glow: "shadow-emerald-500/5" },
-  indigo: { border: "border-indigo-500/20 hover:border-indigo-500/40", bg: "bg-indigo-500/10", text: "text-indigo-400", accent: "bg-indigo-500", glow: "shadow-indigo-500/5" },
-  violet: { border: "border-violet-500/20 hover:border-violet-500/40", bg: "bg-violet-500/10", text: "text-violet-400", accent: "bg-violet-500", glow: "shadow-violet-500/5" },
-  amber: { border: "border-amber-500/20 hover:border-amber-500/40", bg: "bg-amber-500/10", text: "text-amber-400", accent: "bg-amber-500", glow: "shadow-amber-500/5" },
-  rose: { border: "border-rose-500/20 hover:border-rose-500/40", bg: "bg-rose-500/10", text: "text-rose-400", accent: "bg-rose-500", glow: "shadow-rose-500/5" },
-  cyan: { border: "border-cyan-500/20 hover:border-cyan-500/40", bg: "bg-cyan-500/10", text: "text-cyan-400", accent: "bg-cyan-500", glow: "shadow-cyan-500/5" },
-  fuchsia: { border: "border-fuchsia-500/20 hover:border-fuchsia-500/40", bg: "bg-fuchsia-500/10", text: "text-fuchsia-400", accent: "bg-fuchsia-500", glow: "shadow-fuchsia-500/5" },
+// Security profile tone mapping (deliberate, non-AI-purple palette)
+const colorMap: Record<string, { border: string; bg: string; text: string; dot: string }> = {
+  amber: { border: "border-amber-500/30", bg: "bg-amber-500/10", text: "text-amber-300", dot: "bg-amber-400" },
+  emerald: { border: "border-emerald-500/30", bg: "bg-emerald-500/10", text: "text-emerald-300", dot: "bg-emerald-400" },
+  cyan: { border: "border-cyan-500/30", bg: "bg-cyan-500/10", text: "text-cyan-300", dot: "bg-cyan-400" },
+  steel: { border: "border-slate-500/30", bg: "bg-slate-500/10", text: "text-slate-300", dot: "bg-slate-400" },
+  rose: { border: "border-rose-500/30", bg: "bg-rose-500/10", text: "text-rose-300", dot: "bg-rose-400" },
 };
 
 export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMatching, onInspect }) => {
@@ -42,8 +41,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
     toggleFavorite,
     updateAccountLabel,
     activeSessions,
-    currentTabId,
-    currentTabUrl
+    currentTabId
   } = useStore();
 
   const [isSwapping, setIsSwapping] = useState(false);
@@ -53,10 +51,12 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
   const [isEditing, setIsEditing] = useState(false);
   const [editLabel, setEditLabel] = useState(account.name);
   const [editEmail, setEditEmail] = useState(account.email);
-  const [editColor, setEditColor] = useState(account.color);
+  const [editColor, setEditColor] = useState(account.color || "amber");
 
   const colors = Object.keys(colorMap);
-  const cTheme = colorMap[account.color] || colorMap.indigo;
+  // Default to amber if old purple/indigo was saved
+  const safeColor = colorMap[account.color] ? account.color : "amber";
+  const cTheme = colorMap[safeColor];
   const isCurrentlyActiveSession = activeSessions[account.websiteDomain] === account.id;
 
   // Expiry calculations
@@ -67,12 +67,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
     setIsSwapping(true);
     try {
       if (isActiveTabMatching) {
-        // Simple direct swap & reload
         await swapAccount(account.id);
       } else {
-        // Decrypt & restore session first (so website loads logged in)
         const password = useStore.getState().masterPassword;
-        if (!password) throw new Error("Wallet locked");
+        if (!password) throw new Error("Vault locked");
         
         const { decryptData } = await import("@/lib/crypto");
         const { getAdapterForUrl } = await import("@/adapters");
@@ -82,17 +80,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
         
         const adapter = getAdapterForUrl(`https://${account.websiteDomain}`);
         if (adapter) {
-          // Restore cookies for the domain
           await adapter.restore(currentTabId || 0, sessionData);
-          
-          // Redirect the current active tab to the website
           if (currentTabId) {
             chrome.tabs.update(currentTabId, { url: `https://${account.websiteDomain}` });
           }
         }
       }
 
-      // Show success micro-animation
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 2000);
     } catch (err) {
@@ -107,7 +101,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
     setIsEditing(false);
   };
 
-  // Format relative time helper
   const getRelativeTime = (timestamp: number) => {
     const diff = Date.now() - timestamp;
     const mins = Math.floor(diff / 60000);
@@ -118,7 +111,6 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
     return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
 
-  // Get initial letters for avatar
   const getInitials = () => {
     if (account.email) {
       return account.email.substring(0, 2).toUpperCase();
@@ -128,58 +120,65 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
       layout
       className={cn(
-        "relative rounded-xl p-4 transition-all duration-300 border flex flex-col justify-between shadow-md",
-        "bg-slate-900/35 backdrop-blur-md",
-        cTheme.border,
-        cTheme.glow,
-        isCurrentlyActiveSession && "ring-1 ring-indigo-500/40"
+        "relative rounded-lg p-3.5 transition-colors border flex flex-col justify-between",
+        "bg-[#10131c]",
+        isCurrentlyActiveSession 
+          ? "border-amber-500/40 bg-[#121620]" 
+          : "border-[#202534] hover:border-[#2e3549]"
       )}
     >
-      {/* Top Banner indicating Active and/or Expiry status */}
-      <div className="absolute -top-2 right-4 flex items-center gap-1.5 select-none">
-        {isCurrentlyActiveSession && (
-          <span className="px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-indigo-500 text-white flex items-center gap-1 shadow-sm shadow-indigo-500/20">
-            <Sparkles className="w-2.5 h-2.5" />
-            ACTIVE
+      {/* Top Status Indicators */}
+      <div className="flex items-center justify-between gap-1 mb-2.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/[0.05] border border-white/[0.08] text-slate-300">
+            {account.websiteName}
           </span>
-        )}
-        {isExpired && (
-          <span className="px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-rose-500 text-white flex items-center gap-1 shadow-sm shadow-rose-500/20">
-            EXPIRED
+          <span className="text-[9px] font-mono text-slate-500">
+            {account.websiteDomain}
           </span>
-        )}
-        {isExpiringSoon && (
-          <span className="px-2 py-0.5 rounded-full text-[8px] font-bold tracking-wider bg-amber-500 text-slate-950 flex items-center gap-1 shadow-sm shadow-amber-500/20">
-            EXPIRING
-          </span>
-        )}
+        </div>
+
+        <div className="flex items-center gap-1">
+          {isCurrentlyActiveSession && (
+            <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              ACTIVE
+            </span>
+          )}
+          {isExpired && (
+            <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-rose-500/10 text-rose-300 border border-rose-500/20 flex items-center gap-1">
+              <ShieldAlert className="w-2.5 h-2.5" />
+              EXPIRED
+            </span>
+          )}
+          {isExpiringSoon && (
+            <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+              EXPIRING SOON
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Card Body */}
-      <div className="space-y-3">
+      <div>
         {isEditing ? (
-          /* Editing view */
-          <div className="space-y-2">
+          <div className="space-y-2 py-1">
             <input
               type="text"
               value={editLabel}
               onChange={(e) => setEditLabel(e.target.value)}
-              placeholder="Account Name"
-              className="w-full px-2 py-1 bg-slate-950 border border-white/10 rounded-md text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder="Session Label"
+              className="w-full px-2.5 py-1.5 bg-[#090b10] border border-[#232838] rounded text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
             />
             <input
               type="email"
               value={editEmail}
               onChange={(e) => setEditEmail(e.target.value)}
-              placeholder="Email address"
-              className="w-full px-2 py-1 bg-slate-950 border border-white/10 rounded-md text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              placeholder="Identifier / Email"
+              className="w-full px-2.5 py-1.5 bg-[#090b10] border border-[#232838] rounded text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
             />
-            {/* Color select */}
             <div className="flex gap-1.5 pt-1">
               {colors.map((c) => (
                 <button
@@ -187,38 +186,37 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
                   type="button"
                   onClick={() => setEditColor(c)}
                   className={cn(
-                    "w-4 h-4 rounded-full border border-white/10",
-                    colorMap[c]?.accent,
-                    editColor === c && "ring-2 ring-white"
+                    "w-4 h-4 rounded border transition-all",
+                    colorMap[c]?.dot,
+                    editColor === c ? "ring-2 ring-white scale-110" : "opacity-60 hover:opacity-100"
                   )}
                 />
               ))}
             </div>
           </div>
         ) : (
-          /* Static Display View */
           <div className="flex items-start gap-3">
-            {/* Avatar block */}
-            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm tracking-wider select-none", cTheme.bg, cTheme.text)}>
+            {/* Monospace Initial Glyph */}
+            <div className={cn(
+              "w-9 h-9 rounded-md flex items-center justify-center font-mono font-bold text-xs select-none border shrink-0",
+              cTheme.bg,
+              cTheme.text,
+              cTheme.border
+            )}>
               {getInitials()}
             </div>
             
-            {/* Label and Email info */}
+            {/* Identity details */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h3 className="font-semibold text-xs text-white truncate max-w-[120px]">
-                  {account.name}
-                </h3>
-                <span className="text-[10px] text-slate-500 truncate">
-                  ({account.websiteName})
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 truncate mt-0.5">
+              <h3 className="font-semibold text-xs text-slate-100 truncate">
+                {account.name}
+              </h3>
+              <p className="text-[10px] font-mono text-slate-400 truncate mt-0.5">
                 {account.email}
               </p>
-              <div className="flex items-center gap-1 text-[9px] text-slate-500 mt-1">
-                <Clock className="w-3 h-3 text-slate-600" />
-                <span>Last swap: {getRelativeTime(account.lastUsed)}</span>
+              <div className="flex items-center gap-1.5 text-[9px] font-mono text-slate-500 mt-1">
+                <Clock className="w-2.5 h-2.5" />
+                <span>Last active: {getRelativeTime(account.lastUsed)}</span>
               </div>
             </div>
           </div>
@@ -226,26 +224,27 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
       </div>
 
       {/* Action Footer */}
-      <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-4">
-        {/* Toggle States (Pin, Favorite, Delete, Edit) */}
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between border-t border-[#1c2230] pt-2.5 mt-3">
+        {/* State controls */}
+        <div className="flex items-center gap-0.5">
           {isEditing ? (
             <button
               onClick={handleSaveEdit}
-              className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-              title="Save"
+              className="px-2 py-1 rounded text-[11px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1"
+              title="Save Profile"
             >
-              <Save className="w-3.5 h-3.5" />
+              <Save className="w-3 h-3" />
+              <span>Save</span>
             </button>
           ) : (
             <>
               <button
                 onClick={() => togglePin(account.id)}
                 className={cn(
-                  "p-1.5 rounded-lg transition-colors",
-                  account.isPinned ? "text-amber-400 hover:bg-amber-500/10" : "text-slate-500 hover:bg-white/5 hover:text-white"
+                  "p-1.5 rounded transition-colors",
+                  account.isPinned ? "text-amber-400 bg-amber-500/10" : "text-slate-500 hover:bg-white/5 hover:text-slate-200"
                 )}
-                title={account.isPinned ? "Unpin" : "Pin"}
+                title={account.isPinned ? "Unpin from Quick-Access" : "Pin to Quick-Access"}
               >
                 <Pin className="w-3.5 h-3.5" />
               </button>
@@ -253,34 +252,36 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
               <button
                 onClick={() => toggleFavorite(account.id)}
                 className={cn(
-                  "p-1.5 rounded-lg transition-colors",
-                  account.isFavorite ? "text-rose-400 hover:bg-rose-500/10" : "text-slate-500 hover:bg-white/5 hover:text-white"
+                  "p-1.5 rounded transition-colors",
+                  account.isFavorite ? "text-amber-400 bg-amber-500/10" : "text-slate-500 hover:bg-white/5 hover:text-slate-200"
                 )}
-                title={account.isFavorite ? "Remove favorite" : "Favorite"}
+                title={account.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
               >
                 <Star className="w-3.5 h-3.5" />
               </button>
 
               <button
                 onClick={() => setIsEditing(true)}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-white/5 hover:text-white transition-colors"
-                title="Edit details"
+                className="p-1.5 rounded text-slate-500 hover:bg-white/5 hover:text-slate-200 transition-colors"
+                title="Edit Identity Metadata"
               >
-                <Edit2 className="w-3.5 h-3.5" />
+                <Edit3 className="w-3.5 h-3.5" />
               </button>
 
               <button
                 onClick={onInspect}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-white/5 hover:text-white transition-colors"
-                title="Inspect session details"
+                className="p-1.5 rounded text-slate-500 hover:bg-white/5 hover:text-slate-200 transition-colors cursor-pointer"
+                title="Inspect Encrypted Session Payload"
+                aria-label="Inspect session"
+                data-testid="inspect-btn"
               >
-                <Info className="w-3.5 h-3.5" />
+                <Terminal className="w-3.5 h-3.5" />
               </button>
 
               <button
                 onClick={() => deleteAccount(account.id)}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
-                title="Delete profile"
+                className="p-1.5 rounded text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
+                title="Purge Identity from Vault"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -292,14 +293,14 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
         {!isEditing && (
           <button
             onClick={handleSwap}
-            disabled={isSwapping}
+            disabled={isSwapping || isCurrentlyActiveSession}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold select-none transition-all duration-300",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all select-none cursor-pointer",
               isCurrentlyActiveSession
-                ? "bg-slate-800 text-slate-500 cursor-not-allowed"
+                ? "bg-white/[0.04] text-slate-500 border border-white/[0.06] cursor-default font-mono"
                 : showSuccess
-                ? "bg-emerald-600 text-white animate-pulse"
-                : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 active:scale-95"
+                ? "bg-emerald-600 text-white font-bold"
+                : "bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold active:scale-[0.98] shadow-sm"
             )}
           >
             {isSwapping ? (
@@ -316,10 +317,10 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
               {isCurrentlyActiveSession
                 ? "Active"
                 : showSuccess
-                ? "Swapped!"
+                ? "Swapped"
                 : isActiveTabMatching
-                ? "Swap"
-                : "Switch & Go"}
+                ? "Switch"
+                : "Switch & Open"}
             </span>
           </button>
         )}

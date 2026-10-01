@@ -100,11 +100,20 @@ export class BaseAdapter implements WebsiteAdapter {
         name: cookie.name,
         value: cookie.value,
         path: cookie.path,
-        domain: cookie.domain,
         secure: cookie.secure,
         httpOnly: cookie.httpOnly,
         sameSite: cookie.sameSite,
       };
+
+      // Only set domain if NOT a host-only cookie and not __Host- prefixed
+      if (!cookie.hostOnly && !cookie.name.startsWith("__Host-")) {
+        details.domain = cookie.domain;
+      }
+
+      // SameSite=None requires Secure=true
+      if (details.sameSite === "no_restriction" && !details.secure) {
+        details.secure = true;
+      }
 
       if (cookie.expirationDate !== undefined) {
         details.expirationDate = cookie.expirationDate;
@@ -118,22 +127,40 @@ export class BaseAdapter implements WebsiteAdapter {
     }
 
     // 3. Restore localStorage & sessionStorage
-    if (Object.keys(session.localStorage).length > 0 || Object.keys(session.sessionStorage).length > 0) {
+    if (
+      tabId &&
+      (Object.keys(session.localStorage || {}).length > 0 ||
+        Object.keys(session.sessionStorage || {}).length > 0)
+    ) {
       try {
-        await chrome.scripting.executeScript({
-          target: { tabId },
-          func: (ls, ss) => {
-            localStorage.clear();
-            for (const [k, v] of Object.entries(ls)) {
-              localStorage.setItem(k, v);
-            }
-            sessionStorage.clear();
-            for (const [k, v] of Object.entries(ss)) {
-              sessionStorage.setItem(k, v);
-            }
-          },
-          args: [session.localStorage, session.sessionStorage],
-        });
+        const tab = await chrome.tabs.get(tabId);
+        if (
+          tab?.url &&
+          !tab.url.startsWith("chrome://") &&
+          !tab.url.startsWith("chrome-extension://") &&
+          !tab.url.startsWith("edge://") &&
+          (tab.url.includes(this.domain) ||
+            this.hosts.some((h) => tab.url && tab.url.includes(h.replace(/[*:/]/g, ""))))
+        ) {
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            func: (ls, ss) => {
+              try {
+                localStorage.clear();
+                for (const [k, v] of Object.entries(ls)) {
+                  localStorage.setItem(k, v as string);
+                }
+              } catch (e) {}
+              try {
+                sessionStorage.clear();
+                for (const [k, v] of Object.entries(ss)) {
+                  sessionStorage.setItem(k, v as string);
+                }
+              } catch (e) {}
+            },
+            args: [session.localStorage, session.sessionStorage],
+          });
+        }
       } catch (err) {
         console.warn("Could not restore storage via script injection:", err);
       }
@@ -158,16 +185,30 @@ export class BaseAdapter implements WebsiteAdapter {
     }
 
     // 2. Clear localStorage & sessionStorage
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId },
-        func: () => {
-          localStorage.clear();
-          sessionStorage.clear();
-        },
-      });
-    } catch (err) {
-      console.warn("Could not clear storage via script injection:", err);
+    if (tabId) {
+      try {
+        const tab = await chrome.tabs.get(tabId);
+        if (
+          tab?.url &&
+          !tab.url.startsWith("chrome://") &&
+          !tab.url.startsWith("chrome-extension://") &&
+          !tab.url.startsWith("edge://") &&
+          (tab.url.includes(this.domain) ||
+            this.hosts.some((h) => tab.url && tab.url.includes(h.replace(/[*:/]/g, ""))))
+        ) {
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+              try {
+                localStorage.clear();
+                sessionStorage.clear();
+              } catch (e) {}
+            },
+          });
+        }
+      } catch (err) {
+        console.warn("Could not clear storage via script injection:", err);
+      }
     }
   }
 }

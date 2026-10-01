@@ -2,16 +2,15 @@
 
 import React from "react";
 import { 
-  FolderHeart, 
-  Settings, 
-  Layers, 
+  KeySquare, 
+  ShieldSecurity, 
+  Layer, 
   Pin, 
-  Lock, 
-  ExternalLink,
-  ChevronLeft,
-  KeyRound,
-  ShieldCheck
-} from "lucide-react";
+  Star1, 
+  Setting2, 
+  Lock 
+} from "@/components/iconsax";
+import { ExternalLink, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
 import { adapters } from "@/adapters";
@@ -31,9 +30,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
   } = useStore();
 
   const navItems = [
-    { id: "all", label: "All Sessions", icon: Layers },
+    { id: "all", label: "All Sessions", icon: Layer },
     { id: "pinned", label: "Pinned Quick-Access", icon: Pin },
-    { id: "favorites", label: "Favorites", icon: FolderHeart },
+    { id: "favorites", label: "Favorites", icon: Star1 },
   ];
 
   // Unique websites with saved profiles
@@ -57,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
       <div className="p-3.5 border-b border-[#202534] flex items-center justify-between bg-[#0a0c12]">
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-md bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
-            <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+            <KeySquare size={15} className="text-amber-400" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
@@ -69,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
               </span>
             </div>
             <p className="text-[9px] font-mono text-slate-500 flex items-center gap-1">
-              <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+              <ShieldSecurity size={11} className="text-emerald-400" />
               AES-256 GCM
             </p>
           </div>
@@ -166,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, isResponsiv
               : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.04]"
           )}
         >
-          <Settings className="w-3.5 h-3.5 text-slate-400" />
+          <Setting2 size={15} className="text-slate-400" />
           <span>Vault Settings</span>
         </button>
 

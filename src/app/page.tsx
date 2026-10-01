@@ -2,34 +2,30 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { 
+  KeySquare,
   Lock, 
   Unlock, 
-  Search, 
-  Plus, 
-  Settings as SettingsIcon,
-  Grid,
-  Pin,
-  FolderHeart,
-  Key,
-  Database,
-  ArrowRight,
-  Shield,
-  ShieldCheck,
+  SearchNormal, 
+  Add, 
+  Layer, 
+  Global, 
+  Trash, 
+  DocumentDownload, 
+  DocumentUpload, 
+  Eye, 
+  EyeSlash, 
+  Refresh, 
+  Compass, 
   Menu,
-  X,
-  Compass,
-  FileJson,
-  Upload,
-  Download,
-  AlertCircle,
-  CheckCircle,
-  Eye,
-  EyeOff,
-  RefreshCw,
-  HelpCircle,
-  Globe,
-  Trash2,
-  Cpu
+  ShieldSecurity,
+  ShieldTick,
+  CloseCircle
+} from "@/components/iconsax";
+import { 
+  ArrowRight, 
+  AlertCircle, 
+  CheckCircle, 
+  X 
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore, Account } from "@/lib/store";
@@ -49,7 +45,7 @@ export default function Page() {
   if (!mounted) {
     return (
       <div className="min-h-screen bg-[#090b10] flex items-center justify-center font-mono">
-        <RefreshCw className="w-5 h-5 text-amber-500 animate-spin" />
+        <Refresh size={20} className="text-amber-500 animate-spin" />
       </div>
     );
   }
@@ -85,7 +81,7 @@ function DashboardContainer() {
       <div className="min-h-screen bg-[#090b10] flex items-center justify-center font-mono p-4">
         <div className="text-center space-y-3">
           <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
-            <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" />
+            <Refresh size={16} className="text-amber-400 animate-spin" />
           </div>
           <p className="text-[11px] text-slate-400 uppercase tracking-widest">
             Securing Session Store...
@@ -163,7 +159,7 @@ function SetupPasswordView({ onSetup }: SetupPasswordViewProps) {
         <div className="space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
-              <Key className="w-4 h-4" />
+              <KeySquare size={18} />
             </div>
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-white">Create Master Key</h2>
@@ -195,7 +191,7 @@ function SetupPasswordView({ onSetup }: SetupPasswordViewProps) {
                 onClick={() => setShowPass(!showPass)}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
               >
-                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPass ? <EyeSlash size={16} /> : <Eye size={16} />}
               </button>
             </div>
 
@@ -248,7 +244,7 @@ function SetupPasswordView({ onSetup }: SetupPasswordViewProps) {
             className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer shadow-sm shadow-amber-500/20"
           >
             {pending ? (
-              <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+              <Refresh size={16} className="animate-spin text-slate-950" />
             ) : (
               <>
                 <span>Initialize Vault</span>
@@ -292,7 +288,7 @@ function UnlockView({ onUnlock }: UnlockViewProps) {
         <div className="space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400">
-              <Lock className="w-4 h-4" />
+              <Lock size={18} />
             </div>
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-white">Vault Locked</h2>
@@ -325,7 +321,7 @@ function UnlockView({ onUnlock }: UnlockViewProps) {
                 onClick={() => setShowPass(!showPass)}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
               >
-                {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPass ? <EyeSlash size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
@@ -343,11 +339,11 @@ function UnlockView({ onUnlock }: UnlockViewProps) {
             className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded-lg text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer shadow-sm shadow-amber-500/20"
           >
             {pending ? (
-              <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+              <Refresh size={16} className="animate-spin text-slate-950" />
             ) : (
               <>
                 <span>Unlock Vault</span>
-                <Unlock className="w-3.5 h-3.5" />
+                <Unlock size={14} />
               </>
             )}
           </button>
@@ -459,7 +455,7 @@ function MainView() {
                 className="p-1.5 rounded-md hover:bg-white/5 text-slate-400 hover:text-white transition-colors cursor-pointer"
                 aria-label="Open sidebar menu"
               >
-                <Menu className="w-4 h-4" />
+                <Menu size={16} />
               </button>
             )}
             <h2 className="font-mono font-bold text-xs uppercase tracking-wider text-slate-300">
@@ -484,7 +480,7 @@ function MainView() {
                 <CapturePanel adapter={matchingAdapter} />
               ) : (
                 <div className="p-3 rounded-lg border border-white/5 bg-[#0d1017] flex items-start gap-2.5">
-                  <Compass className="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
+                  <Compass size={16} className="text-slate-500 mt-0.5 flex-shrink-0" />
                   <div className="space-y-0.5">
                     <h4 className="text-[11px] font-semibold text-slate-300">
                       No active website detected
@@ -498,7 +494,7 @@ function MainView() {
 
               {/* Search Bar */}
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                <SearchNormal size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="text"
                   value={searchQuery}
@@ -525,7 +521,7 @@ function MainView() {
                   ) : (
                     <div className="text-center py-12 space-y-2 border border-dashed border-white/10 rounded-lg bg-[#0d1017]/40">
                       <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-slate-500">
-                        <Grid className="w-4 h-4" />
+                        <Layer size={16} />
                       </div>
                       <div className="space-y-1">
                         <h4 className="text-xs font-semibold text-slate-300">
@@ -551,7 +547,7 @@ function MainView() {
         {swappingAccount && (
           <div className="fixed inset-0 z-50 bg-[#090b10]/95 backdrop-blur-sm flex flex-col items-center justify-center space-y-4 select-none">
             <div className="w-12 h-12 rounded-full border-2 border-amber-500/20 border-t-amber-500 animate-spin flex items-center justify-center">
-              <Cpu className="w-5 h-5 text-amber-400" />
+              <Refresh size={20} className="text-amber-400" />
             </div>
             <div className="text-center space-y-1">
               <h3 className="font-mono font-bold text-xs uppercase tracking-wider text-white">
@@ -622,7 +618,7 @@ function MainView() {
                   </div>
                 ) : !inspectedSession ? (
                   <div className="flex flex-col items-center justify-center py-10 space-y-2">
-                    <RefreshCw className="w-4 h-4 text-amber-500 animate-spin" />
+                    <Refresh size={16} className="text-amber-500 animate-spin" />
                     <p className="text-[10px] font-mono text-slate-500">Decrypting session payload...</p>
                   </div>
                 ) : activeInspectorTab === "cookies" ? (
@@ -808,7 +804,7 @@ function CapturePanel({ adapter }: { adapter: any }) {
           onClick={() => setIsOpen(true)}
           className="flex items-center gap-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1.5 rounded transition-colors select-none cursor-pointer shadow-sm shadow-amber-500/20"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Add size={14} />
           <span>Capture</span>
         </button>
       </div>
@@ -819,7 +815,7 @@ function CapturePanel({ adapter }: { adapter: any }) {
     <div className="p-3.5 rounded-lg border border-amber-500/30 bg-[#0f131c] space-y-3">
       <div className="flex items-center justify-between border-b border-white/10 pb-2">
         <h4 className="text-[11px] font-mono font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
-          <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+          <ShieldTick size={15} className="text-amber-400" />
           Save {adapter.name} Session
         </h4>
         <button 
@@ -906,10 +902,10 @@ function CapturePanel({ adapter }: { adapter: any }) {
             className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 text-xs font-mono font-bold uppercase tracking-wider py-2 rounded transition-colors cursor-pointer shadow-sm shadow-amber-500/20"
           >
             {loading ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-950" />
+              <Refresh size={14} className="animate-spin text-slate-950" />
             ) : (
               <>
-                <Upload className="w-3.5 h-3.5" />
+                <DocumentUpload size={14} />
                 <span>Encrypt & Save</span>
               </>
             )}
@@ -1024,7 +1020,7 @@ function SettingsView() {
       {/* Custom Sites Management */}
       <div className="p-3.5 rounded-lg border border-white/10 bg-[#0d1017] space-y-3">
         <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-          <Globe className="w-3.5 h-3.5 text-amber-400" />
+          <Global size={15} className="text-amber-400" />
           Custom Websites
         </h3>
         
@@ -1098,7 +1094,7 @@ function SettingsView() {
                     className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                     aria-label={`Delete custom site ${site.name}`}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash size={14} />
                   </button>
                 </div>
               ))}
@@ -1110,7 +1106,7 @@ function SettingsView() {
       {/* Security Architecture */}
       <div className="p-3.5 rounded-lg border border-white/10 bg-[#0d1017] space-y-2">
         <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-          <Key className="w-3.5 h-3.5 text-amber-400" />
+          <KeySquare size={15} className="text-amber-400" />
           Security Architecture
         </h3>
         <p className="text-[10px] font-mono text-slate-400 leading-relaxed">
@@ -1121,7 +1117,7 @@ function SettingsView() {
       {/* Encrypted Backups */}
       <div className="p-3.5 rounded-lg border border-white/10 bg-[#0d1017] space-y-3">
         <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-          <FileJson className="w-3.5 h-3.5 text-amber-400" />
+          <ShieldSecurity size={15} className="text-amber-400" />
           Encrypted Backups
         </h3>
         
@@ -1144,7 +1140,7 @@ function SettingsView() {
                 onClick={() => setShowPass(!showPass)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
               >
-                {showPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                {showPass ? <EyeSlash size={15} /> : <Eye size={15} />}
               </button>
             </div>
           </div>
@@ -1167,7 +1163,7 @@ function SettingsView() {
             onClick={handleExport}
             className="w-full flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/15 text-white text-xs font-mono font-medium py-1.5 rounded-md cursor-pointer transition-colors"
           >
-            <Download className="w-3.5 h-3.5" />
+            <DocumentDownload size={14} />
             <span>Generate Encrypted Backup</span>
           </button>
         </div>
@@ -1205,7 +1201,7 @@ function SettingsView() {
             type="submit"
             className="w-full flex items-center justify-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-mono font-bold uppercase tracking-wider py-1.5 rounded-md cursor-pointer transition-colors"
           >
-            <Upload className="w-3.5 h-3.5" />
+            <DocumentUpload size={14} />
             <span>Restore Backup</span>
           </button>
         </form>

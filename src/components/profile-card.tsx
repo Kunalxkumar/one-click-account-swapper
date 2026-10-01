@@ -3,17 +3,16 @@
 import React, { useState } from "react";
 import { 
   Pin, 
-  Star, 
-  Trash2, 
-  RefreshCw, 
-  Check, 
-  ExternalLink,
-  Edit3,
-  Clock,
-  Save,
-  Terminal,
-  ShieldAlert
-} from "lucide-react";
+  Star1, 
+  Trash, 
+  Refresh, 
+  Edit2, 
+  Clock, 
+  Code,
+  ArrowSwapHorizontal,
+  ShieldSecurity 
+} from "@/components/iconsax";
+import { Check, ExternalLink, Save } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Account, useStore } from "@/lib/store";
@@ -149,7 +148,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
           )}
           {isExpired && (
             <span className="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-rose-500/10 text-rose-300 border border-rose-500/20 flex items-center gap-1">
-              <ShieldAlert className="w-2.5 h-2.5" />
+              <ShieldSecurity size={11} />
               EXPIRED
             </span>
           )}
@@ -246,7 +245,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
                 )}
                 title={account.isPinned ? "Unpin from Quick-Access" : "Pin to Quick-Access"}
               >
-                <Pin className="w-3.5 h-3.5" />
+                <Pin size={14} />
               </button>
 
               <button
@@ -257,7 +256,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
                 )}
                 title={account.isFavorite ? "Remove from Favorites" : "Add to Favorites"}
               >
-                <Star className="w-3.5 h-3.5" />
+                <Star1 size={14} />
               </button>
 
               <button
@@ -265,7 +264,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
                 className="p-1.5 rounded text-slate-500 hover:bg-white/5 hover:text-slate-200 transition-colors"
                 title="Edit Identity Metadata"
               >
-                <Edit3 className="w-3.5 h-3.5" />
+                <Edit2 size={14} />
               </button>
 
               <button
@@ -275,7 +274,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
                 aria-label="Inspect session"
                 data-testid="inspect-btn"
               >
-                <Terminal className="w-3.5 h-3.5" />
+                <Code size={14} />
               </button>
 
               <button
@@ -283,7 +282,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
                 className="p-1.5 rounded text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
                 title="Purge Identity from Vault"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash size={14} />
               </button>
             </>
           )}
@@ -304,11 +303,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ account, isActiveTabMa
             )}
           >
             {isSwapping ? (
-              <RefreshCw className="w-3 h-3 animate-spin" />
+              <Refresh size={13} className="animate-spin" />
             ) : showSuccess ? (
               <Check className="w-3 h-3" />
             ) : isActiveTabMatching ? (
-              <RefreshCw className="w-3 h-3" />
+              <ArrowSwapHorizontal size={13} />
             ) : (
               <ExternalLink className="w-3 h-3" />
             )}
